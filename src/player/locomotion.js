@@ -3,6 +3,7 @@
 // for Mixamo-compatible humanoids. Missing clips are time-scaled / weight-blended.
 import * as THREE from 'three';
 import { collectBones, applyFootIK } from './ik.js';
+import { animTuning, critDamp, critDampAngle } from './animTuning.js';
 
 const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -43,8 +44,9 @@ export class Locomotion {
     this.root = loaded.root;
     this.fallback = !!loaded.fallback;
     this.tuning = opts.tuning || {};
-    const locoT = this.tuning.loco || {};
-    this.clipSpeeds = { idle: 0, walk: 1.4, jog: 2.8, run: 5.0, sprint: 7.5, ...(locoT.clipSpeeds || {}) };
+    this.anim = animTuning;
+    const locoT = this.anim.loco;
+    this.clipSpeeds = { ...locoT.clipSpeeds };
     this.mixer = this.fallback ? null : new THREE.AnimationMixer(this.root);
     this.clips = { ...(loaded.clips || {}) };
     this.clipMap = loaded.clipMap || {};
@@ -56,11 +58,18 @@ export class Locomotion {
 
     this.phase = 0; this.idleT = 0;
     this.speed = 0; this.targetSpeed = 0; this.prevSpeed = 0;
+    this._spd = { p: 0, v: 0 };
     this.yaw = this.object.rotation.y; this.targetYaw = this.yaw; this.yawVel = 0;
+    this._yawS = { p: this.yaw, v: 0 };
     this.lean = 0; this.pitchLean = 0;
+    this._lean = { p: 0, v: 0 }; this._pitch = { p: 0, v: 0 };
     this.full = [];
     this.ikWeight = 1;
-    this.busy = false;
+    this.grounded = true; this.vy = 0;
+    this.anticipate = 0; this.startPush = 0; this.stopSettle = 0;
+    this._pushed = false; this._settling = false;
+    this.hipProcY = 0; this.airPitch = 0;
+    this._air = { p: 0, v: 0 }; this._land = { p: 0, v: 0 };
     this._q = new THREE.Quaternion(); this._e = new THREE.Euler();
   }
 
@@ -108,7 +117,22 @@ export class Locomotion {
   }
   setYaw(yaw, snap = false) {
     this.targetYaw = yaw;
-    if (snap) { this.yaw = yaw; this.object.rotation.y = yaw; }
+    if (snap) {
+      this.yaw = yaw; this._yawS.p = yaw; this._yawS.v = 0;
+      this.object.rotation.y = yaw;
+    }
+  }
+  setVertical(vy, grounded) {
+    this.vy = vy;
+    this.grounded = !!grounded;
+  }
+  beginJump() { this.anticipate = 1; this.grounded = false; }
+  land(impact) {
+    const J = this.anim.jump;
+    const depth = -Math.min(J.landMax, Math.max(0, impact) * J.landGain);
+    this._land.p = Math.min(this._land.p, depth);
+    this.anticipate = 0;
+    this.grounded = true;
   }
 
   play(logical, opts = {}) {
@@ -134,37 +158,61 @@ export class Locomotion {
   update(dt, { physics, ikTuning } = {}) {
     if (dt <= 0) return;
     this.prevSpeed = this.speed;
-    const up = this.tuning.loco?.speedLambdaUp ?? 7;
-    const down = this.tuning.loco?.speedLambdaDown ?? 9;
-    this.speed = damp(this.speed, this.targetSpeed, this.targetSpeed > this.speed ? up : down, dt);
+    const L = this.anim.loco;
+    const omegaSpd = this.targetSpeed > this._spd.p ? L.speedOmegaUp : L.speedOmegaDown;
+    this.speed = critDamp(this._spd, this.targetSpeed, omegaSpd, dt);
+    if (this.speed < 0) { this.speed = 0; this._spd.p = 0; if (this._spd.v < 0) this._spd.v = 0; }
 
-    const turnRate = THREE.MathUtils.degToRad(this.tuning.player?.turnRateDeg ?? 720);
-    const diff = wrapPi(this.targetYaw - this.yaw);
-    const maxRate = turnRate * (this.isBusy ? 0.35 : 1);
-    const yawRate = clamp(diff * 10, -maxRate, maxRate);
-    this.yaw = wrapPi(this.yaw + yawRate * dt);
+    const prevYaw = this.yaw;
+    const maxRate = THREE.MathUtils.degToRad(L.maxTurnRateDeg) * (this.isBusy ? L.busyTurnScale : 1);
+    critDampAngle(this._yawS, this.targetYaw, L.turnOmega, dt);
+    let dy = wrapPi(this._yawS.p - prevYaw);
+    const maxStep = maxRate * dt;
+    if (Math.abs(dy) > maxStep) {
+      this._yawS.p = wrapPi(prevYaw + Math.sign(dy) * maxStep);
+      this._yawS.v = clamp(this._yawS.v, -maxRate, maxRate);
+      dy = wrapPi(this._yawS.p - prevYaw);
+    }
+    this.yaw = this._yawS.p;
     this.object.rotation.y = this.yaw;
-    this.yawVel = damp(this.yawVel, yawRate, 8, dt);
-    const leanGain = this.tuning.loco?.leanGain ?? 0.06;
-    const maxLean = this.tuning.loco?.maxLean ?? 16;
-    const leanTgt = clamp(this.yawVel * this.speed * leanGain * 57.3 / 10, -maxLean, maxLean);
-    this.lean = damp(this.lean, leanTgt, 8, dt);
-    this.pitchLean = damp(this.pitchLean, clamp((this.speed - this.prevSpeed) / Math.max(dt, 1e-4) * 1.2, -10, 10), 6, dt);
+    this.yawVel = dt > 1e-5 ? dy / dt : this._yawS.v;
 
-    // Loco weights + shared phase so feet stay planted at authored speeds
+    const leanTgt = clamp(this.yawVel * this.speed * L.leanGain, -L.maxLean, L.maxLean);
+    this.lean = critDamp(this._lean, leanTgt, L.leanOmega, dt);
+    const accel = (this.speed - this.prevSpeed) / Math.max(dt, 1e-4);
+    const accelTgt = clamp(accel * L.accelLeanGain, -L.accelLeanMax, L.accelLeanMax);
+    this.pitchLean = critDamp(this._pitch, accelTgt, L.accelLeanOmega, dt);
+
+    // Start push / stop settle envelopes
+    if (!this._pushed && this.targetSpeed > L.startPushSpeed && this.prevSpeed < L.startPushFrom && this.speed >= this.prevSpeed) {
+      this.startPush = 1; this._pushed = true;
+    }
+    if (this.speed < L.startPushFrom && this.targetSpeed < 0.2) this._pushed = false;
+    this.startPush = Math.max(0, this.startPush - dt / L.startPushDur);
+
+    if (!this._settling && this.targetSpeed < 0.15 && this.prevSpeed > L.stopSettleFrom && this.speed < this.prevSpeed) {
+      this.stopSettle = clamp(this.prevSpeed / Math.max(0.01, this.clipSpeeds.run), 0.35, 1);
+      this._settling = true;
+    }
+    if (this.targetSpeed > 0.3) this._settling = false;
+    if (this._settling) this.stopSettle = Math.max(0, this.stopSettle - dt / L.stopSettleDur);
+    if (this.stopSettle <= 0) this._settling = false;
+
+    // Loco weights + shared phase; playback rate matches ground speed so feet don't skate.
     const moving = this.loco.filter((l) => l.v > 0);
     const v = this.speed;
     const w = this.loco.map(() => 0);
     let rate = 0;
-    const idx = (n) => this.loco.findIndex((l) => l.name === n);
+    const strideOf = (l) => Math.max(1e-3, l.v * l.clip.duration);
     if (moving.length) {
       const first = moving[0];
       if (v <= first.v) {
         const a = first.v > 0 ? v / first.v : 0;
-        const i0 = idx('idle'), i1 = this.loco.indexOf(first);
+        const i0 = this.loco.findIndex((l) => l.name === 'idle');
+        const i1 = this.loco.indexOf(first);
         if (i0 >= 0) w[i0] = 1 - a;
         if (i1 >= 0) w[i1] = i0 >= 0 ? a : 1;
-        rate = Math.max(0.65, a) / Math.max(0.01, first.clip.duration);
+        rate = v / strideOf(first);
       } else {
         let k = moving.length - 1;
         for (let i = 0; i < moving.length - 1; i++) if (v <= moving[i + 1].v) { k = i; break; }
@@ -172,12 +220,12 @@ export class Locomotion {
         const a = B === A ? 1 : clamp((v - A.v) / (B.v - A.v), 0, 1);
         w[this.loco.indexOf(A)] = 1 - a;
         w[this.loco.indexOf(B)] = a;
-        const T = A.clip.duration * (1 - a) + B.clip.duration * a;
-        rate = (1 / Math.max(0.01, T)) * (B === A || v > B.v ? v / B.v : 1);
+        const stride = strideOf(A) * (1 - a) + strideOf(B) * a;
+        rate = v / Math.max(1e-3, stride);
       }
     } else if (this.loco[0]) w[0] = 1;
 
-    const blendLam = this.tuning.loco?.blendLambda ?? 14;
+    const blendLam = L.blendLambda;
     this.loco.forEach((l, i) => { l.w = damp(l.w, w[i], blendLam, dt); });
     const prevPhase = this.phase;
     this.phase = (this.phase + rate * dt) % 1;
@@ -188,8 +236,8 @@ export class Locomotion {
     }
 
     if (this.mixer) {
-      for (const L of this.full) L.step(dt);
-      for (const L of this.full.filter((l) => l.done)) { L.action.setEffectiveWeight(0); L.action.stop(); L.onDone?.(L); }
+      for (const lyr of this.full) lyr.step(dt);
+      for (const lyr of this.full.filter((l) => l.done)) { lyr.action.setEffectiveWeight(0); lyr.action.stop(); lyr.onDone?.(lyr); }
       this.full = this.full.filter((l) => !l.done);
       const sumF = this.full.reduce((a, l) => a + l.w, 0), F = Math.min(1, sumF);
       for (const l of this.full) l.action.setEffectiveWeight(sumF > 1 ? l.w / sumF : l.w);
@@ -202,17 +250,51 @@ export class Locomotion {
       this.mixer.update(dt); // timeScale is 0 on loco actions; we set .time ourselves
     }
 
+    this._applyProcedural(dt);
     this._applyLean();
     if (physics && !this.fallback && this.ikWeight > 0) {
-      applyFootIK(this.root, this.bones, physics, ikTuning || this.tuning.ik || {}, this.ikWeight);
+      applyFootIK(this.root, this.bones, physics, {
+        ...this.anim.ik,
+        ...(ikTuning || {}),
+        hipOffsetY: this.hipProcY,
+      }, this.ikWeight, dt);
+    } else {
+      this._applyHipOffset();
     }
+  }
+
+  _applyProcedural(dt) {
+    const J = this.anim.jump;
+    const L = this.anim.loco;
+    this.anticipate = Math.max(0, this.anticipate - dt / J.anticipateDur);
+    const airTgt = this.grounded ? 0 : clamp(this.vy * J.airVyPitch, -J.airTuckPitch, J.airStretchPitch);
+    this.airPitch = critDamp(this._air, airTgt, J.airPoseOmega, dt);
+    critDamp(this._land, 0, J.landOmega, dt);
+    const airY = this.grounded ? 0 : clamp(this.vy * J.airVyHip, -J.airTuckHip, J.airStretchHip);
+    this.hipProcY = -this.anticipate * J.anticipateHip
+      - this.startPush * L.startPushHip
+      - this.stopSettle * L.stopSettleHip
+      + airY
+      + this._land.p;
+  }
+
+  _applyHipOffset() {
+    const hips = this.bones && this.bones.hips;
+    if (!hips) return;
+    if (!hips._ikRest) hips._ikRest = hips.position.clone();
+    hips.position.copy(hips._ikRest);
+    hips.position.y += this.hipProcY;
+    hips.updateMatrixWorld(true);
   }
 
   _applyLean() {
     const b = this.bones; if (!b.hips && !b.spine) return;
+    const L = this.anim.loco;
     const k = 1 - Math.min(1, this.full.reduce((a, l) => a + (l.w || 0), 0)) * 0.7;
     const lean = THREE.MathUtils.degToRad(this.lean) * k;
-    const pitch = THREE.MathUtils.degToRad(this.pitchLean) * k;
+    const pitch = THREE.MathUtils.degToRad(
+      this.pitchLean + this.startPush * L.startPushPitch + this.stopSettle * L.stopSettlePitch + this.airPitch
+    ) * k;
     const add = (bone, x, y, z) => {
       if (!bone) return;
       this._q.setFromEuler(this._e.set(x, y, z));

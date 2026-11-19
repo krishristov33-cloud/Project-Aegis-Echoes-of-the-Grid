@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Locomotion } from './locomotion.js';
 import { Combat, createCombatFx } from './combat.js';
 import { moveAxis, wantsSprint, wantsWalk, wantsJump, wantsMelee, wantsBlast } from '../core/input.js';
+import { animTuning } from './animTuning.js';
 
 const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -103,7 +104,7 @@ export function createPlayer(ctx) {
   }
 
   function update(dt, camYaw) {
-    if (player.hp <= 0) { player.state = 'dead'; loco.setMove(0); loco.update(dt, { physics, ikTuning: tuning.ik }); return; }
+    if (player.hp <= 0) { player.state = 'dead'; loco.setMove(0); loco.setVertical(0, player.isGrounded); loco.update(dt, { physics, ikTuning: animTuning.ik }); return; }
 
     // respawn if we fell off the world
     if (object.position.y < (tuning.levels?.voidY ?? -24)) {
@@ -130,6 +131,7 @@ export function createPlayer(ctx) {
         player._jumpBuf = 0;
         player.state = 'jump';
         loco.ikWeight = 0;
+        loco.beginJump();
         loco.play('jump', { fade: 0.06, fadeOut: 0.1 });
       }
     }
@@ -148,7 +150,8 @@ export function createPlayer(ctx) {
       loco.setMove(0, v.yaw);
       player.yaw = v.yaw;
       player.state = 'vault';
-      loco.update(dt, { physics: null, ikTuning: tuning.ik });
+      loco.setVertical(0, true);
+      loco.update(dt, { physics: null, ikTuning: animTuning.ik });
       combat.update(dt, player);
       fx.update(combat, player);
       if (u >= 1) {
@@ -223,12 +226,14 @@ export function createPlayer(ctx) {
     const wasGrounded = player.isGrounded;
     player.isGrounded = res.grounded;
     if (res.grounded) {
-      if (player.velocity.y < 0) player.velocity.y = 0;
       if (!wasGrounded && player.state !== 'vault') {
+        const impact = Math.max(0, -player.velocity.y);
         player._landT = 0.22;
+        loco.land(impact);
         loco.play('land', { fade: 0.05, fadeOut: 0.15 });
         bus.emit('noise', { pos: object.position.clone(), radius: 5, kind: 'land' });
       }
+      if (player.velocity.y < 0) player.velocity.y = 0;
       loco.ikWeight = 1;
     } else {
       loco.ikWeight = 0.15;
@@ -236,7 +241,8 @@ export function createPlayer(ctx) {
 
     const spd = Math.hypot(player.velocity.x, player.velocity.z);
     loco.setMove(player.isGrounded ? spd : Math.max(spd, 0.5), player.yaw);
-    loco.update(dt, { physics, ikTuning: tuning.ik });
+    loco.setVertical(player.velocity.y, player.isGrounded);
+    loco.update(dt, { physics, ikTuning: animTuning.ik });
     combat.update(dt, player);
     fx.update(combat, player);
 
