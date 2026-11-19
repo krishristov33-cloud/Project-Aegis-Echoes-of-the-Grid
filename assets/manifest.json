@@ -1,8 +1,34 @@
 {
-  "version": 1,
-  "note": "Swap a role's url to change the model. clipMap values are clip names inside the GLB. Missing clips are time-scaled or weight-blended from the nearest available locomotion clip. boneMap is optional: canonical VRM-style humanoid name -> rig bone name (hips, spine, chest, upperChest, neck, head, leftUpperLeg, leftLowerLeg, leftFoot, leftToes, rightUpperLeg, rightLowerLeg, rightFoot, rightToes, leftShoulder, leftUpperArm, leftLowerArm, leftHand, and right arm equivalents). If omitted or partial, the loader auto-detects Mixamo (mixamorig*) and common patterns (Rigify DEF-*, unprefixed, VRM). IK / locomotion / combat only use the canonical map. Planned clip base: Quaternius Universal Animation Library 1+2 (CC0, in-place). This push uses three.js Xbot / Soldier (MIT) because the free UAL export uses Rigify DEF- bones and needs Aether retarget (A1). See plannedUALClipMap. Incoming Tripo/Meshy meshes land in /workspace/apex/aegis/models/ \u2014 swap via url + boneMap only. Higgsfield / Meshy rigs drop in with a path + boneMap change only.",
+  "version": 2,
+  "note": "Swap a role's url to change the model. boneMap may be an object or the key 'MESHY24_BONE_MAP' (Meshy 24-joint rig; Spine02 is the lowest spine \u2014 never auto-detect). animSource is a donor role whose clips are retargeted through Aether's retargetRole (inPlace). Unrigged roles use scale/yOffset/rotY from MODELS.md. Optimized GLBs in assets/models/ are KTX2 (etc1s color, uastc normals) + meshopt.",
+  "boneMaps": {
+    "MESHY24_BONE_MAP": {
+      "hips": "Hips",
+      "spine": "Spine02",
+      "chest": "Spine01",
+      "upperChest": "Spine",
+      "neck": "neck",
+      "head": "Head",
+      "leftShoulder": "LeftShoulder",
+      "leftUpperArm": "LeftArm",
+      "leftLowerArm": "LeftForeArm",
+      "leftHand": "LeftHand",
+      "rightShoulder": "RightShoulder",
+      "rightUpperArm": "RightArm",
+      "rightLowerArm": "RightForeArm",
+      "rightHand": "RightHand",
+      "leftUpperLeg": "LeftUpLeg",
+      "leftLowerLeg": "LeftLeg",
+      "leftFoot": "LeftFoot",
+      "leftToes": "LeftToeBase",
+      "rightUpperLeg": "RightUpLeg",
+      "rightLowerLeg": "RightLeg",
+      "rightFoot": "RightFoot",
+      "rightToes": "RightToeBase"
+    }
+  },
   "roles": {
-    "player": {
+    "player_anims": {
       "url": "assets/Xbot.glb",
       "license": "MIT (three.js examples, Mixamo Xbot)",
       "height": 1.8,
@@ -48,88 +74,226 @@
         "rightToes": "mixamorig:RightToeBase"
       }
     },
-    "soldier": {
-      "url": "assets/Soldier.glb",
-      "license": "MIT (three.js examples, Mixamo Soldier / Vanguard)",
-      "height": 1.8,
+    "player": {
+      "url": "assets/models/characters/kael.glb",
+      "license": "Original (Tripo H3.1 + Meshy). Hero Kael.",
+      "rig": "meshy24",
+      "height": 1.78,
       "radius": 0.32,
+      "scale": 1,
+      "yOffset": 0,
+      "boneMap": "MESHY24_BONE_MAP",
+      "emissive": 0.16,
       "clipMap": {
-        "idle": "Idle",
-        "walk": "Walk",
-        "jog": "Walk",
-        "run": "Run",
-        "sprint": "Run",
+        "idle": "idle",
+        "walk": "walk",
+        "jog": "walk",
+        "run": "run",
+        "sprint": "run",
         "jump": null,
         "fall": null,
         "land": null,
         "vault": null,
-        "melee1": null,
-        "melee2": null,
-        "melee3": null,
-        "blast": null,
-        "hit": null
+        "melee1": "agree",
+        "melee2": "headShake",
+        "melee3": "agree",
+        "blast": "sneak_pose",
+        "hit": "sad_pose"
       },
-      "boneMap": {
-        "hips": "mixamorig:Hips",
-        "spine": "mixamorig:Spine",
-        "chest": "mixamorig:Spine1",
-        "upperChest": "mixamorig:Spine2",
-        "neck": "mixamorig:Neck",
-        "head": "mixamorig:Head",
-        "leftShoulder": "mixamorig:LeftShoulder",
-        "leftUpperArm": "mixamorig:LeftArm",
-        "leftLowerArm": "mixamorig:LeftForeArm",
-        "leftHand": "mixamorig:LeftHand",
-        "rightShoulder": "mixamorig:RightShoulder",
-        "rightUpperArm": "mixamorig:RightArm",
-        "rightLowerArm": "mixamorig:RightForeArm",
-        "rightHand": "mixamorig:RightHand",
-        "leftUpperLeg": "mixamorig:LeftUpLeg",
-        "leftLowerLeg": "mixamorig:LeftLeg",
-        "leftFoot": "mixamorig:LeftFoot",
-        "leftToes": "mixamorig:LeftToeBase",
-        "rightUpperLeg": "mixamorig:RightUpLeg",
-        "rightLowerLeg": "mixamorig:RightLeg",
-        "rightFoot": "mixamorig:RightFoot",
-        "rightToes": "mixamorig:RightToeBase"
-      }
+      "animSource": "player_anims"
     },
-    "drone": {
-      "url": null,
-      "fallback": "sphere",
-      "height": 0.45,
-      "radius": 0.28,
-      "clipMap": {}
+    "soldier": {
+      "url": "assets/models/characters/soldier.glb",
+      "license": "Original (Tripo H3.1 + Meshy). Directorate soldier.",
+      "rig": "meshy24",
+      "height": 1.85,
+      "radius": 0.32,
+      "scale": 1,
+      "yOffset": 0,
+      "boneMap": "MESHY24_BONE_MAP",
+      "emissive": 0.16,
+      "clipMap": {
+        "idle": "idle",
+        "walk": "walk",
+        "jog": "walk",
+        "run": "run",
+        "sprint": "run",
+        "jump": null,
+        "fall": null,
+        "land": null,
+        "vault": null,
+        "melee1": "agree",
+        "melee2": "headShake",
+        "melee3": "agree",
+        "blast": "sneak_pose",
+        "hit": "sad_pose"
+      },
+      "animSource": "player_anims"
+    },
+    "exosuit": {
+      "url": "assets/models/characters/exosuit.glb",
+      "license": "Original (Tripo H3.1 + Meshy 3d_rigging). See MODELS.md.",
+      "rig": "meshy24",
+      "height": 2.8,
+      "radius": 0.5,
+      "scale": 1,
+      "yOffset": 0,
+      "boneMap": "MESHY24_BONE_MAP",
+      "emissive": 0.16,
+      "clipMap": {
+        "idle": "idle",
+        "walk": "walk",
+        "jog": "walk",
+        "run": "run",
+        "sprint": "run",
+        "jump": null,
+        "fall": null,
+        "land": null,
+        "vault": null,
+        "melee1": "agree",
+        "melee2": "headShake",
+        "melee3": "agree",
+        "blast": "sneak_pose",
+        "hit": "sad_pose"
+      },
+      "animSource": "player_anims"
     },
     "hulk": {
-      "url": null,
-      "fallback": "capsule",
-      "height": 3.2,
-      "radius": 0.7,
-      "scale": 2.4,
+      "url": "assets/models/characters/hulk.glb",
+      "license": "Original (Tripo H3.1 + Meshy 3d_rigging). See MODELS.md.",
+      "rig": "meshy24",
+      "height": 4.0,
+      "radius": 0.9,
+      "scale": 1,
+      "yOffset": 0,
+      "boneMap": "MESHY24_BONE_MAP",
+      "emissive": 0.12,
+      "clipMap": {
+        "idle": "idle",
+        "walk": "walk",
+        "jog": "walk",
+        "run": "run",
+        "sprint": "run",
+        "jump": null,
+        "fall": null,
+        "land": null,
+        "vault": null,
+        "melee1": "agree",
+        "melee2": "headShake",
+        "melee3": "agree",
+        "blast": "sneak_pose",
+        "hit": "sad_pose"
+      },
+      "animSource": "player_anims"
+    },
+    "light_creator": {
+      "url": "assets/models/characters/light_creator.glb",
+      "license": "Original (Tripo H3.1 + Meshy 3d_rigging). See MODELS.md.",
+      "rig": "meshy24",
+      "height": 2.6,
+      "radius": 0.45,
+      "scale": 1,
+      "yOffset": 0,
+      "boneMap": "MESHY24_BONE_MAP",
+      "emissive": 0.28,
+      "clipMap": {},
+      "note": "Legs hidden by the robe \u2014 hover/idle only, no Mixamo locomotion."
+    },
+    "soul_harvester": {
+      "url": "assets/models/characters/soul_harvester.glb",
+      "license": "Original (Tripo H3.1). Unrigged; animate procedurally.",
+      "rigged": false,
+      "height": 2.4,
+      "radius": 0.4,
+      "scale": 2.47,
+      "yOffset": 1.2,
+      "emissive": 0.28,
+      "clipMap": {}
+    },
+    "megafauna": {
+      "url": "assets/models/characters/megafauna.glb",
+      "license": "Original (Tripo H3.1). Unrigged; head was +X, rotY faces +Z.",
+      "rigged": false,
+      "height": 5.0,
+      "radius": 1.4,
+      "scale": 9.6,
+      "yOffset": 2.5,
+      "rotY": -1.5707963267948966,
+      "emissive": 0.14,
+      "clipMap": {}
+    },
+    "drone": {
+      "url": "assets/models/props/drone.glb",
+      "license": "Original (Tripo H3.1).",
+      "rigged": false,
+      "height": 0.33,
+      "radius": 0.5,
+      "scale": 0.8,
+      "yOffset": 0.13,
+      "emissive": 0.32,
       "clipMap": {}
     }
   },
-  "plannedClipSource": {
-    "name": "Quaternius Universal Animation Library 1+2",
-    "license": "CC0-1.0",
-    "source": "https://quaternius.com (UAL 1 free also mirrored as J-Ponzo/gltf-universal-animation-library). UAL 2 is a separate pack.",
-    "blocker": "Free UAL glTF uses Rigify DEF-* bone names, not mixamorig:. Do not drop the raw library into assets until A1 retargets in-place clips onto the Mixamo humanoid.",
-    "clipMap": {
-      "idle": "Idle_Loop",
-      "walk": "Walk_Loop",
-      "jog": "Jog_Fwd_Loop",
-      "run": "Jog_Fwd_Loop",
-      "sprint": "Sprint_Loop",
-      "jump": "Jump_Start",
-      "fall": "Jump_Loop",
-      "land": "Jump_Land",
-      "vault": "Roll",
-      "melee1": "Punch_Jab",
-      "melee2": "Punch_Cross",
-      "melee3": "Sword_Attack",
-      "blast": "Spell_Simple_Shoot",
-      "hit": "Hit_Chest"
+  "props": {
+    "drone": {
+      "url": "assets/models/props/drone.glb",
+      "scale": 0.8,
+      "yOffset": 0.13,
+      "emissive": 0.32
+    },
+    "monolith": {
+      "url": "assets/models/props/monolith.glb",
+      "scale": 12,
+      "yOffset": 5.87,
+      "emissive": 0.22
+    },
+    "gate_arch": {
+      "url": "assets/models/props/gate_arch.glb",
+      "scale": 6,
+      "yOffset": 2.57,
+      "emissive": 0.18
+    },
+    "resonance_ring": {
+      "url": "assets/models/props/resonance_ring.glb",
+      "scale": 6,
+      "yOffset": 4.0,
+      "emissive": 0.4
+    },
+    "crystals": {
+      "url": "assets/models/props/crystals.glb",
+      "scale": 3,
+      "yOffset": 1.5,
+      "emissive": 0.45
+    },
+    "panel_block": {
+      "url": "assets/models/props/panel_block.glb",
+      "scale": 18,
+      "yOffset": 9.0,
+      "emissive": 0.16
+    },
+    "hvac_neon": {
+      "url": "assets/models/props/hvac_neon.glb",
+      "scale": 2.2,
+      "yOffset": 0.77,
+      "emissive": 0.4
+    },
+    "crate": {
+      "url": "assets/models/props/crate.glb",
+      "scale": 1.2,
+      "yOffset": 0.29,
+      "emissive": 0.08
+    },
+    "speaker_stack": {
+      "url": "assets/models/props/speaker_stack.glb",
+      "scale": 3,
+      "yOffset": 1.5,
+      "emissive": 0.2
+    },
+    "altar": {
+      "url": "assets/models/props/altar.glb",
+      "scale": 1.8,
+      "yOffset": 0.65,
+      "emissive": 0.22
     }
   }
 }

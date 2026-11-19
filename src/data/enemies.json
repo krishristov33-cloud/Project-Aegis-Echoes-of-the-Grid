@@ -30,7 +30,8 @@
     "patrol": { "waitTime": [1.5, 4.0] },
     "investigate": { "lookTime": 3.0 },
     "duckDefault": 1.2,
-    "suppressionDecay": 0.6
+    "suppressionDecay": 0.6,
+    "punishWindow": 0.35
   },
   "drone": {
     "hp": 40,
@@ -62,7 +63,8 @@
       "reactionTime": 0.3
     },
     "spotShareInterval": 0.5,
-    "duckDefault": 1.5
+    "duckDefault": 1.5,
+    "punishWindow": 0.35
   },
   "squad": {
     "commsDelay": 0.4,

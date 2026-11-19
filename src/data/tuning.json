@@ -90,7 +90,25 @@
   },
   "audio": {
     "bpm": 174,
-    "beatsPerBar": 4
+    "beatsPerBar": 4,
+    "mixHealth": {
+      "maxDrive": 18,
+      "minBits": 4,
+      "crushBelow": 0.5,
+      "minCutoff": 1400,
+      "hitSpike": 2.5,
+      "spikeTime": 0.35,
+      "healSweep": 0.8,
+      "heartbeatBelow": 0.3,
+      "heartbeatDip": 0.22
+    },
+    "sidechain": {
+      "depth": 0.65,
+      "onBeatDepth": 0.85,
+      "attack": 0.008,
+      "releaseBeats": 0.5,
+      "thump": 0.7
+    }
   },
   "rain": {
     "count": 1100,

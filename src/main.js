@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { bus, Events } from './core/events.js';
 import { Time } from './core/time.js';
-import { input, bindInput, endFrame, setScriptedInput, clearScriptedInput, keyJust } from './core/input.js';
-import { loadManifest, loadRole } from './core/assets.js';
+import { input, bindInput, endFrame, setScriptedInput, clearScriptedInput, keyJust, wantsBlink } from './core/input.js';
+import { loadManifest, loadRole, initAssets } from './core/assets.js';
 import { createAudioClock } from './core/audio-clock.js';
 import { PhysicsWorld } from './core/physics.js';
 import { createPlayer } from './player/controller.js';
@@ -15,6 +15,7 @@ import { createHud } from './ui/hud.js';
 import { createTempoWidget } from './ui/tempo-widget.js';
 import { initFX } from './fx/index.js';
 import { createEncounters } from './ai/encounters.js';
+import { createBlink } from './player/powers/blink.js';
 import { createMixHealth } from './audio/mixhealth.js';
 import { createSidechain } from './audio/sidechain.js';
 
@@ -59,6 +60,8 @@ async function boot() {
   resize(renderer, camera);
   addEventListener('resize', () => resize(renderer, camera));
 
+  await initAssets(renderer);
+
   const physics = new PhysicsWorld();
   const time = new Time();
   if (SHOTS) time.maxDt = 0.08; // headless swiftshader runs few frames; let sim catch up
@@ -99,6 +102,12 @@ async function boot() {
     bus, scene, physics, player, enemies, manifest,
     data: { enemies: enemiesData, strings },
   });
+
+  const blink = createBlink({
+    bus, player, physics, scene, clock, time,
+    cfg: { ...(powers.blink || {}), bindKey: null },
+  });
+  blink.aimYaw = () => orbit.yaw;
 
   const levelCtx = { scene, physics, strings, enemiesData, powers, puzzle, tuning, bus };
   const factories = {
@@ -141,6 +150,7 @@ async function boot() {
     get level() { return current?.name; },
     get ai() { return encounters.ai; },
     encounters,
+    blink,
     goto,
     tuning,
     strings,
@@ -160,6 +170,7 @@ async function boot() {
     get clock() { return clock; },
     get ai() { return encounters.ai; },
     get encounters() { return encounters; },
+    get blink() { return blink; },
     Events,
     state() {
       return {
@@ -196,6 +207,7 @@ async function boot() {
     tryVault() { return pawn.tryVault(orbit.yaw); },
     attack() { player.combat.requestMelee(); },
     blast() { player.combat.requestBlast(); },
+    blinkNow() { return blink.trigger(orbit.yaw); },
     damage(n) { player.takeDamage(n ?? 10, 'debug'); },
     goto,
   };
@@ -227,6 +239,8 @@ async function boot() {
 
     pawn.update(dt, orbit.yaw);
     orbit.update(dt, player.position, physics);
+    if (wantsBlink()) blink.trigger(orbit.yaw);
+    blink.update(dt);
     current?.update?.(dt, player.position, bus);
     encounters.update(dt);
     fx.update(dt);

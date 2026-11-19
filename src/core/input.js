@@ -8,7 +8,7 @@ export const input = {
   mouseDy: 0,
   locked: false,
   enabled: true,
-  _script: { forward: 0, right: 0, sprint: false, walk: false, jump: false, melee: false, blast: false },
+  _script: { forward: 0, right: 0, sprint: false, walk: false, jump: false, melee: false, blast: false, blink: false },
   _scripting: false,
 };
 
@@ -52,6 +52,7 @@ export function endFrame() {
     input._script.jump = false;
     input._script.melee = false;
     input._script.blast = false;
+    input._script.blink = false;
   }
 }
 
@@ -62,7 +63,7 @@ export function setScriptedInput(partial = {}) {
 
 export function clearScriptedInput() {
   input._scripting = false;
-  input._script = { forward: 0, right: 0, sprint: false, walk: false, jump: false, melee: false, blast: false };
+  input._script = { forward: 0, right: 0, sprint: false, walk: false, jump: false, melee: false, blast: false, blink: false };
 }
 
 export function moveAxis() {
@@ -82,6 +83,7 @@ export function wantsWalk() { return input._scripting ? !!input._script.walk : (
 export function wantsJump() { return input._scripting ? !!input._script.jump : (keyJust('Space')); }
 export function wantsMelee() { return input._scripting ? !!input._script.melee : (keyJust('Mouse0') || keyJust('KeyJ')); }
 export function wantsBlast() { return input._scripting ? !!input._script.blast : (keyJust('KeyF') || keyJust('KeyK')); }
+export function wantsBlink() { return input._scripting ? !!input._script.blink : (keyJust('KeyQ') || keyJust('KeyE')); }
 
 export function consumeMouse() {
   const x = input.mouseDx, y = input.mouseDy;
