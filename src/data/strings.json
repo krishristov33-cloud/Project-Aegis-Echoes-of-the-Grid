@@ -71,6 +71,22 @@
   },
   "title": "Project Aegis: Echoes of the Grid",
   "subtitle": "Echoes of the Grid",
-  "prompt": "Click to start · WASD move · Shift sprint · Space jump / vault · Left click melee · F Sub-Bass Blast",
-  "loading": "AEGIS · LOADING"
+  "prompt": "Click to start \u00b7 WASD move \u00b7 Shift sprint \u00b7 Space jump / vault \u00b7 Left click melee \u00b7 F Sub-Bass Blast",
+  "loading": "AEGIS \u00b7 LOADING",
+  "hud": {
+    "hp": "HP",
+    "bpm": "BPM",
+    "enterPrefix": "NOW ENTERING",
+    "levels": {
+      "rooftop": "SOFIA ROOFTOP",
+      "cradle": "ANTARCTIC CRADLE",
+      "chamber": "WORLD ENGINE",
+      "arena": "DISSONANT ARENA"
+    },
+    "phases": {
+      "enter": "{level}",
+      "clear": "CLEAR",
+      "fail": "SIGNAL LOST"
+    }
+  }
 }

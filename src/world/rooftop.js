@@ -1,11 +1,11 @@
 // Sofia rooftop escape greybox. Mood from Krea's 00_master: rainy-night teal fog,
 // wet concrete, magenta/cyan amuNet neon on a glass tower, warm apartment windows.
 import * as THREE from 'three';
-import { addBox, makeMat, wetGridTexture, neonSign, createDummyEnemy } from './greybox.js';
+import { addBox, makeMat, wetGridTexture, neonSign } from './greybox.js';
 import { createRain } from './rain.js';
 
 export function createRooftop(ctx) {
-  const { scene, physics, strings, enemiesData, loadedSoldier } = ctx;
+  const { scene, physics, strings } = ctx;
   const group = new THREE.Group(); group.name = 'rooftop';
   const ids = [];
   const mats = {
@@ -75,7 +75,7 @@ export function createRooftop(ctx) {
   }
 
   // Ramp up to a short raised platform (slopes)
-  const ramp = addBox({ group, physics, mats }, {
+  box({
     id: 'ramp',
     size: [2.4, 0.22, 5.2],
     pos: [-7.5, 0.55, 1.2],
@@ -83,7 +83,6 @@ export function createRooftop(ctx) {
     mat: mats.concrete,
     userData: { solid: true, ground: true },
   });
-  if (ramp.id) ids.push(ramp.id);
   box({ size: [2.6, 0.3, 2.4], pos: [-7.5, 1.2, 4.4], mat: mats.concrete, userData: { solid: true, ground: true } });
 
   // Lower connecting roof (+Z) — a drop / later escape path
@@ -160,24 +159,6 @@ export function createRooftop(ctx) {
   // Fog is set on the scene in load()
   const rain = createRain(ctx.tuning, group);
 
-  // Training dummy (Enemy API, not C1 AI) — Soldier if loaded
-  const dummyPos = new THREE.Vector3(3.2, 0, 5.0);
-  const dummy = createDummyEnemy({
-    id: 'dummy-rooftop',
-    position: dummyPos,
-    hp: (enemiesData && enemiesData.dummy && enemiesData.dummy.hp) || 80,
-    visual: loadedSoldier && !loadedSoldier.fallback ? loadedSoldier.root : null,
-  });
-  group.add(dummy.object);
-  if (loadedSoldier?.gltf && !loadedSoldier.fallback) {
-    try {
-      const mix = new THREE.AnimationMixer(loadedSoldier.root);
-      const idleName = loadedSoldier.clipMap?.idle;
-      const clip = idleName && loadedSoldier.clips[idleName];
-      if (clip) { const a = mix.clipAction(clip); a.play(); dummy._mixer = mix; }
-    } catch (e) { /* visual only */ }
-  }
-
   const spawn = new THREE.Vector3(0, 0, 0);
   const portals = [
     { to: 'cradle', pos: new THREE.Vector3(0, -2.5, 20), radius: 1.8, label: 'DROP' },
@@ -190,7 +171,7 @@ export function createRooftop(ctx) {
     spawn,
     faceYaw: 0,
     portals,
-    enemies: [dummy],
+    enemies: [],
     rain,
     physicsIds: ids,
     fog: { color: 0x0a141c, near: 8, far: 70 },
@@ -198,8 +179,6 @@ export function createRooftop(ctx) {
     update(dt, playerPos) {
       rain.setOrigin(playerPos);
       rain.update(dt);
-      dummy.update(dt);
-      if (dummy._mixer) dummy._mixer.update(dt);
     },
     unload() {
       rain.dispose();

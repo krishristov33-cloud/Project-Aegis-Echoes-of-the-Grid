@@ -12,6 +12,9 @@ export const Events = Object.freeze({
   blink: 'blink',
   callout: 'callout',
   levelState: 'levelState',
+  phaseSkip: 'phaseSkip',
+  waveShield: 'waveShield',
+  launchpad: 'launchpad',
 });
 
 class Bus {

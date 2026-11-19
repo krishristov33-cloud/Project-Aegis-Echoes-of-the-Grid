@@ -58,6 +58,9 @@ bus.emit('levelState', {level, phase})            // L3/C5
 bus.emit('enemyShot', {id, from, to, hit, targetGhost})  // tracer / muzzle flash / gunshot sfx (A2, sfx)
 bus.emit('enemyHit', {id, kind, amount, hp, hpMax, pos, src}) // hit reaction anim, hitmarker (A1, L5)
 bus.emit('enemyKilled', {id, kind, pos})                 // death anim, resonance, level flow (A1, L3, L6)
+bus.emit('phaseSkip', {from, to})                        // C3 → A2 phase-skip streak
+bus.emit('waveShield', {origin, dir, duration})          // C3 → A2 wave-shield VFX
+bus.emit('launchpad', {origin, burst?})                  // C3 → A2 launchpad pulse / burst
 ```
 Note on the labels above: they predate the final owner split. Current owners: `beat` is L6, `sidechain` comes from L4/L7 and `src/ai/director.js` ducks enemies on it, `noise` is consumed by C1 hearing, `blink` is emitted by L8 and C1 makes enemies shoot the ghost, `callout` is emitted by C1 squads for L5.
 Player API exposed on `game.player`: `position, velocity, isGrounded, hp, state, applyImpulse(v), takeDamage(n, src)`.

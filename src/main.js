@@ -12,6 +12,9 @@ import { createCradle } from './world/cradle.js';
 import { createChamber } from './world/chamber.js';
 import { createArena } from './world/arena.js';
 import { createHud } from './ui/hud.js';
+import { createTempoWidget } from './ui/tempo-widget.js';
+import { initFX } from './fx/index.js';
+import { createEncounters } from './ai/encounters.js';
 import { createMixHealth } from './audio/mixhealth.js';
 import { createSidechain } from './audio/sidechain.js';
 
@@ -63,7 +66,8 @@ async function boot() {
   createMixHealth(bus);
   createSidechain(bus);
 
-  const hud = createHud({ root: document.getElementById('hud'), strings });
+  const hud = createHud({ root: document.getElementById('hud'), strings, bus, debug: DEBUG });
+  const tempo = createTempoWidget({ root: document.getElementById('hud'), bus, strings });
   const titleEl = document.getElementById('title-text');
   const subEl = document.getElementById('subtitle-text');
   if (titleEl) titleEl.textContent = strings.title || 'Project Aegis';
@@ -81,10 +85,6 @@ async function boot() {
     console.warn('[aegis] player load failed', err);
     loadedPlayer = await loadRole('player', { roles: { player: { url: null, fallback: 'capsule', height: 1.8, radius: 0.32, clipMap: {} } } });
   }
-  let loadedSoldier = null;
-  try { loadedSoldier = await loadRole('soldier', manifest); }
-  catch (err) { console.warn('[aegis] soldier load failed', err); }
-
   const enemies = [];
   const getEnemies = () => enemies;
 
@@ -95,7 +95,12 @@ async function boot() {
 
   const orbit = new ThirdPersonCamera(camera, tuning);
 
-  const levelCtx = { scene, physics, strings, enemiesData, powers, puzzle, tuning, loadedSoldier, bus };
+  const encounters = createEncounters({
+    bus, scene, physics, player, enemies, manifest,
+    data: { enemies: enemiesData, strings },
+  });
+
+  const levelCtx = { scene, physics, strings, enemiesData, powers, puzzle, tuning, bus };
   const factories = {
     rooftop: createRooftop,
     cradle: createCradle,
@@ -107,18 +112,18 @@ async function boot() {
   function goto(name) {
     if (!factories[name]) { console.warn('unknown level', name); return; }
     if (current) {
-      enemies.length = 0;
       current.unload();
+      current = null;
     }
-    current = factories[name](levelCtx);
-    if (current.enemies) enemies.push(...current.enemies);
-    if (current.fog) {
-      scene.fog = new THREE.Fog(current.fog.color, current.fog.near, current.fog.far);
-      renderer.setClearColor(current.clearColor ?? current.fog.color, 1);
+    const level = factories[name](levelCtx);
+    current = level;
+    if (level.fog) {
+      scene.fog = new THREE.Fog(level.fog.color, level.fog.near, level.fog.far);
+      renderer.setClearColor(level.clearColor ?? level.fog.color, 1);
     }
-    pawn.setSpawn(current.spawn);
-    pawn.face(current.faceYaw ?? 0, true);
-    orbit.setLook(current.faceYaw ?? 0, 0.28);
+    pawn.setSpawn(level.spawn);
+    pawn.face(level.faceYaw ?? 0, true);
+    orbit.setLook(level.faceYaw ?? 0, 0.28);
     bus.emit('levelState', { level: name, phase: 'enter' });
   }
 
@@ -134,6 +139,8 @@ async function boot() {
     clock,
     input,
     get level() { return current?.name; },
+    get ai() { return encounters.ai; },
+    encounters,
     goto,
     tuning,
     strings,
@@ -141,6 +148,7 @@ async function boot() {
     enemies,
   };
   window.game = game;
+  const fx = initFX(game);
   window.AG = {
     version: '0.1.0',
     ready: false,
@@ -150,6 +158,8 @@ async function boot() {
     get bus() { return bus; },
     get game() { return game; },
     get clock() { return clock; },
+    get ai() { return encounters.ai; },
+    get encounters() { return encounters; },
     Events,
     state() {
       return {
@@ -165,6 +175,7 @@ async function boot() {
         bpm: clock.getBpm(),
         phase: clock.getPhase(),
         onBeat: clock.isOnBeat(),
+        enemies: enemies.length,
       };
     },
     tp(x, z, y) {
@@ -217,6 +228,8 @@ async function boot() {
     pawn.update(dt, orbit.yaw);
     orbit.update(dt, player.position, physics);
     current?.update?.(dt, player.position, bus);
+    encounters.update(dt);
+    fx.update(dt);
 
     if (portalLock > 0) portalLock -= dt;
     if (current?.portals && portalLock <= 0) {
@@ -245,7 +258,9 @@ async function boot() {
       bpm: clock.getBpm(),
       phase: clock.getPhase(),
       onBeat: clock.isOnBeat(),
+      dt,
     });
+    tempo.update(dt);
     endFrame();
     if (!AG.ready) { AG.ready = true; window.__AG_BOOTED = true; }
   }

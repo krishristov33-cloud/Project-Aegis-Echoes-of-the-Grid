@@ -26,8 +26,28 @@ export class Enemy {
     this.yaw = 0;
     this.view = view ?? null; // Object3D the renderer shows; AI writes its transform
     if (this.view) this.view.userData.enemy = this; // lets raycasts map a hit mesh back to its enemy
+    this.knockback = new THREE.Vector3(); // from Sub-Bass Blast (combat.js calls applyImpulse)
+    this.target = null; // the player, set every update; used when damage arrives without a position
     this.duckedUntil = -Infinity;
     this.now = 0;
+  }
+
+  /** Same field name as the greybox dummy so level code can treat all enemies alike. */
+  get object() {
+    return this.view;
+  }
+
+  /** Knockback (combat.js Sub-Bass Blast). Horizontal part slides the enemy; subclasses consume it. */
+  applyImpulse(v) {
+    if (this.dead) return;
+    this.knockback.add(v);
+  }
+
+  /** Where the damage came from: a src with a position, or the player for player-sourced hits ({source:'player'}). */
+  sourcePosition(src) {
+    if (src?.position) return src.position;
+    if (src === 'player' || src?.source === 'player' || src?.id === 'player') return this.target?.position ?? null;
+    return null;
   }
 
   get ducked() {

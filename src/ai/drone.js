@@ -11,7 +11,6 @@ import { yawTo, angleDelta, flatDist } from './util.js';
 const _desired = new THREE.Vector3();
 const _steer = new THREE.Vector3();
 const _dir = new THREE.Vector3();
-const _down = new THREE.Vector3(0, -1, 0);
 const _tmp = new THREE.Vector3();
 
 export class Drone extends Enemy {
@@ -38,7 +37,6 @@ export class Drone extends Enemy {
     this._reportT = 0;
     this._groundT = 0;
     this._crashed = false;
-    this._ray = new THREE.Raycaster();
     this.position.y = this.groundY + o.cfg.altitude;
   }
 
@@ -50,7 +48,12 @@ export class Drone extends Enemy {
 
   update(dt, now, player) {
     this.now = now;
+    this.target = player;
     const c = this.cfg;
+    if (this.knockback.lengthSq() > 0.01) {
+      this.velocity.add(this.knockback);
+      this.knockback.set(0, 0, 0);
+    }
     if (this.dead) {
       this._fall(dt);
       return;
@@ -134,11 +137,9 @@ export class Drone extends Enemy {
     const v = this.velocity.length();
     if (v > 0.2) {
       _dir.copy(this.velocity).divideScalar(v);
-      this._ray.set(this.position, _dir);
-      this._ray.far = c.avoidDistance + v * 0.5;
-      const hit = this._ray.intersectObjects(this.los.occluders, true)[0];
+      const hit = this.los.probe(this.position, _dir, c.avoidDistance + v * 0.5);
       if (hit) {
-        const n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : _dir.clone().negate();
+        const n = hit.normal ?? _dir.clone().negate();
         _steer.addScaledVector(n, c.acceleration * 1.5);
         _steer.y += c.acceleration * 0.5; // prefer climbing over things
       }
@@ -167,7 +168,8 @@ export class Drone extends Enemy {
   }
 
   onHurt(n, src) {
-    if (src?.position) this.squad?.report(this, src.position, true);
+    const pos = this.sourcePosition(src);
+    if (pos) this.squad?.report(this, pos, true);
   }
 
   onDeath() {

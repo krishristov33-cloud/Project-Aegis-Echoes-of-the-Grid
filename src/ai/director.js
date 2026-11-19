@@ -1,52 +1,54 @@
-// AI director: the one entry point the game uses for enemies.
+// AI director: one per loaded level. Builds the navmesh, cover points and line of sight straight from the
+// physics world (src/core/physics.js API), then spawns, ticks and ducks enemies.
 //
-//   import { createAI } from './ai/director.js';
-//   const ai = await createAI({
-//     bus, player: game.player,
-//     level: { navMeshes, occluders, coverMeshes },   // Object3D/Mesh lists from the level greybox
-//     data: { enemies, strings },                     // parsed src/data/enemies.json + strings.json
-//   });
+//   const ai = await createAI({ bus, player: game.player, physics: game.physics, data: { enemies, strings } });
 //   const squad = ai.createSquad('roof-a');
-//   ai.spawnSoldier({ position, patrol: [p1, p2], squad, view: soldierObject3D });
-//   ai.spawnDrone({ position, patrol: [...], squad, view: droneObject3D });
-//   // in the game loop:
-//   ai.update(dt);
-// `player` may be passed later: ai.player = game.player (it only needs the Player API).
+//   ai.spawnSoldier({ position, patrol: [p1, p2], squad, view });   // view = Object3D (manifest role)
+//   ai.spawnDrone({ position, patrol: [...], squad, view });
+//   // loop: ai.update(dt)      level unload: ai.dispose()
+// Most callers want encounters.js instead, which does all of this per level from enemies.json.
 //
-// Also listens to bus `sidechain {source, strength, onBeat}` and ducks enemies:
-//   source = enemy id (string)          -> ducks that enemy
-//   source = { pos, radius }            -> ducks every enemy inside the radius
-// Duration = enemy duckDefault x strength (x1.5 on beat).
+// Bus: listens to `sidechain {source, strength, onBeat}` — source `{pos, radius}` ducks every enemy inside it
+// (combat.js already ducks the enemies it hits on-beat via enemy.duck()). Duration = duckDefault x strength (x1.5 on beat).
+// Also adds/removes Wave-Shield meshes (`shieldRaised` / `shieldLowered`) to the line-of-sight occluders (C3).
 import { createNav } from './nav.js';
 import { CoverSystem } from './cover.js';
 import { Squad } from './squad.js';
 import { Soldier } from './soldier.js';
 import { Drone } from './drone.js';
-import { LineOfSight } from './util.js';
+import { levelFromPhysics, PhysicsLineOfSight } from './level-geometry.js';
 
-export async function createAI({ bus, player, level, data }) {
+export async function createAI({ bus, player = null, physics, data }) {
   const E = data.enemies;
-  const nav = await createNav(level.navMeshes, { agentRadius: E.soldier.radius, agentHeight: E.soldier.height });
-  const los = new LineOfSight(level.occluders);
+  const geo = levelFromPhysics(physics, { lowCover: E.cover.lowHeight * 0.8 });
+  const nav = await createNav(geo, { agentRadius: E.soldier.radius, agentHeight: E.soldier.height });
+  const los = new PhysicsLineOfSight(physics);
   const cover = new CoverSystem({ nav, los, cfg: E.cover });
-  cover.generate(level.coverMeshes ?? level.occluders);
+  cover.generate(geo.coverBoxes);
 
   const enemies = [];
   const squads = [];
   let now = 0;
 
-  const offSidechain = bus.on('sidechain', ({ source, strength = 1, onBeat }) => {
-    const mult = strength * (onBeat ? 1.5 : 1);
-    if (typeof source === 'string') {
-      const e = ai.byId(source);
-      e?.duck(e.cfg.duckDefault * mult);
-    } else if (source?.pos) {
-      for (const e of enemies) if (!e.dead && e.position.distanceTo(source.pos) <= (source.radius ?? 4)) e.duck(e.cfg.duckDefault * mult);
-    }
-  });
+  const offs = [
+    bus.on('sidechain', ({ source, strength = 1, onBeat } = {}) => {
+      const mult = strength * (onBeat ? 1.5 : 1);
+      if (typeof source === 'string') {
+        const e = ai.byId(source);
+        e?.duck(e.cfg.duckDefault * mult);
+      } else if (source?.pos) {
+        for (const e of enemies) if (!e.dead && e.position.distanceTo(source.pos) <= (source.radius ?? 4)) e.duck(e.cfg.duckDefault * mult);
+      }
+    }),
+    bus.on('shieldRaised', ({ object } = {}) => object && los.extra.push(object)),
+    bus.on('shieldLowered', ({ object } = {}) => {
+      const i = los.extra.indexOf(object);
+      if (i >= 0) los.extra.splice(i, 1);
+    }),
+  ];
 
   const ai = {
-    /** The target every enemy fights. Settable, so the player can be built after the navmesh. */
+    /** The target every enemy fights (Player API). Settable. */
     player,
     nav,
     los,
@@ -58,7 +60,7 @@ export async function createAI({ bus, player, level, data }) {
     },
 
     createSquad(name) {
-      const s = new Squad({ bus, cfg: E.squad, strings: data.strings.callouts, nav, name });
+      const s = new Squad({ bus, cfg: E.squad, strings: data.strings.callouts ?? {}, nav, name });
       squads.push(s);
       return s;
     },
@@ -77,7 +79,7 @@ export async function createAI({ bus, player, level, data }) {
       return d;
     },
 
-    /** Register an externally-built enemy (e.g. the Hulk) so it gets ticked, ducked and found by id. */
+    /** Register an externally built enemy (e.g. the Hulk) so it gets ticked, ducked and found by id. */
     register(enemy) {
       enemies.push(enemy);
       return enemy;
@@ -85,18 +87,6 @@ export async function createAI({ bus, player, level, data }) {
 
     byId(id) {
       return enemies.find((e) => e.id === id) ?? null;
-    },
-
-    /** Nearest living enemy to a point (for melee targeting / lock-on). */
-    nearest(pos, maxDist = Infinity) {
-      let best = null;
-      let bd = maxDist;
-      for (const e of enemies) {
-        if (e.dead) continue;
-        const d = e.position.distanceTo(pos);
-        if (d < bd) [best, bd] = [e, d];
-      }
-      return best;
     },
 
     update(dt) {
@@ -110,8 +100,9 @@ export async function createAI({ bus, player, level, data }) {
     },
 
     dispose() {
-      offSidechain?.();
+      offs.forEach((off) => off?.());
       enemies.forEach((e) => e.dispose());
+      enemies.length = 0;
       nav.dispose();
     },
   };
