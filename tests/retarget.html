@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><title>Aegis · Retarget test (Xbot → Meshy)</title>
+<style>html,body{margin:0;background:#0b1118;color:#d8f4ff;font:13px system-ui;overflow:hidden}canvas{display:block}
+#hud{position:fixed;left:12px;top:10px;background:rgba(6,12,18,.75);padding:8px 12px;border:1px solid #1e3a4a;border-radius:6px;white-space:pre}</style>
+<script>(function(){var im=document.createElement('script');im.type='importmap';
+im.textContent=JSON.stringify({imports:{'three':'https://unpkg.com/three@0.164.1/build/three.module.js','three/addons/':'https://unpkg.com/three@0.164.1/examples/jsm/'}});
+document.currentScript.after(im);})();</script></head>
+<body><div id="hud">loading…</div>
+<script type="module">
+// Usage: tests/retarget.html?model=models/characters/kael.glb&clip=walk
+// Left: Xbot source. Right: Meshy target driven by retargeted clips. Keys 1-9 switch clip.
+import * as THREE from 'three';
+import { loadRole } from '../src/core/assets.js';
+import { MESHY24_BONE_MAP, retargetRole } from '../src/core/retarget.js';
+const P = new URLSearchParams(location.search);
+const modelUrl = P.get('model') || 'models/characters/kael.glb';
+const manifest = { roles: {
+  src: { url: 'assets/Xbot.glb', height: 1.8 },
+  tgt: { url: modelUrl, height: +(P.get('h') || 1.78), boneMap: MESHY24_BONE_MAP },
+}};
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setSize(innerWidth, innerHeight); document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0b1118);
+scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x203040, 2.2));
+const sun = new THREE.DirectionalLight(0xffffff, 2.5); sun.position.set(3, 6, 5); scene.add(sun);
+const grid = new THREE.GridHelper(10, 20, 0x3df0ff, 0x1e3a4a); scene.add(grid);
+const cam = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 100);
+cam.position.set(0, 1.3, 6.2); cam.lookAt(0, 0.95, 0);
+const base = location.pathname.replace(/tests\/retarget\.html$/, '');
+for (const k in manifest.roles) manifest.roles[k].url = base + manifest.roles[k].url;
+const src = await loadRole('src', manifest);
+const tgt = await loadRole('tgt', manifest);
+const t0 = performance.now();
+retargetRole(tgt, src, { inPlace: true });
+const bakeMs = performance.now() - t0;
+src.root.position.x = -1.1; tgt.root.position.x = 1.1;
+scene.add(src.root, tgt.root);
+const mS = new THREE.AnimationMixer(src.root), mT = new THREE.AnimationMixer(tgt.root);
+const names = src.gltf.animations.map((c) => c.name);
+let cur = P.get('clip') || 'walk';
+function play(n) {
+  cur = n; mS.stopAllAction(); mT.stopAllAction();
+  const a = src.clips[n], b = tgt.clips[n]; if (!a || !b) return;
+  mS.clipAction(a).play(); mT.clipAction(b).play();
+}
+play(cur);
+addEventListener('keydown', (e) => { const i = +e.key - 1; if (names[i]) play(names[i]); });
+// Pose-match metric: angle between bone direction vectors (bone -> child slot) on both rigs.
+const segs = [['leftUpperArm','leftLowerArm'],['leftLowerArm','leftHand'],['rightUpperArm','rightLowerArm'],['rightLowerArm','rightHand'],
+  ['leftUpperLeg','leftLowerLeg'],['leftLowerLeg','leftFoot'],['rightUpperLeg','rightLowerLeg'],['rightLowerLeg','rightFoot'],['spine','neck']];
+const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), d = new THREE.Vector3();
+window.poseError = () => {
+  let worst = 0, sum = 0;
+  for (const [p, q] of segs) {
+    const sb = src.bones, tb = tgt.bones;
+    if (!sb[p] || !sb[q] || !tb[p] || !tb[q]) continue;
+    sb[q].getWorldPosition(a).sub(sb[p].getWorldPosition(b)).normalize();
+    tb[q].getWorldPosition(c).sub(tb[p].getWorldPosition(d)).normalize();
+    const ang = THREE.MathUtils.radToDeg(a.angleTo(c)); worst = Math.max(worst, ang); sum += ang;
+  }
+  return { worst, mean: sum / segs.length };
+};
+// Rest offset (A-pose vs T-pose) is the baseline difference that must stay constant, not grow.
+window.setTimeAll = (t) => { mS.setTime(t); mT.setTime(t); scene.updateMatrixWorld(true); };
+window.play = play; window.names = names;
+window.ready = { bakeMs, clips: Object.keys(tgt.clips), map: tgt.boneMap };
+const clock = new THREE.Clock();
+r.setAnimationLoop(() => {
+  const dt = window.freeze ? 0 : clock.getDelta(); mS.update(dt); mT.update(dt);
+  r.render(scene, cam);
+  document.getElementById('hud').textContent = `clip: ${cur}  (keys 1-${names.length}: ${names.join(', ')})\nbake ${bakeMs.toFixed(0)} ms · ${modelUrl}`;
+});
+</script></body></html>
