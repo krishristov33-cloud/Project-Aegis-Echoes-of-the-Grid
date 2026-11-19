@@ -8,7 +8,7 @@ export const input = {
   mouseDy: 0,
   locked: false,
   enabled: true,
-  _script: { forward: 0, right: 0, sprint: false, walk: false, jump: false, melee: false, blast: false, blink: false },
+  _script: { forward: 0, right: 0, sprint: false, walk: false, jump: false, melee: false, blast: false, blink: false, phaseSkip: false, waveShield: false, launchpad: false },
   _scripting: false,
 };
 
@@ -53,6 +53,9 @@ export function endFrame() {
     input._script.melee = false;
     input._script.blast = false;
     input._script.blink = false;
+    input._script.phaseSkip = false;
+    input._script.waveShield = false;
+    input._script.launchpad = false;
   }
 }
 
@@ -63,7 +66,7 @@ export function setScriptedInput(partial = {}) {
 
 export function clearScriptedInput() {
   input._scripting = false;
-  input._script = { forward: 0, right: 0, sprint: false, walk: false, jump: false, melee: false, blast: false, blink: false };
+  input._script = { forward: 0, right: 0, sprint: false, walk: false, jump: false, melee: false, blast: false, blink: false, phaseSkip: false, waveShield: false, launchpad: false };
 }
 
 export function moveAxis() {
@@ -83,7 +86,10 @@ export function wantsWalk() { return input._scripting ? !!input._script.walk : (
 export function wantsJump() { return input._scripting ? !!input._script.jump : (keyJust('Space')); }
 export function wantsMelee() { return input._scripting ? !!input._script.melee : (keyJust('Mouse0') || keyJust('KeyJ')); }
 export function wantsBlast() { return input._scripting ? !!input._script.blast : (keyJust('KeyF') || keyJust('KeyK')); }
-export function wantsBlink() { return input._scripting ? !!input._script.blink : (keyJust('KeyQ') || keyJust('KeyE')); }
+export function wantsBlink() { return input._scripting ? !!input._script.blink : keyJust('KeyQ'); }
+export function wantsPhaseSkip() { return input._scripting ? !!input._script.phaseSkip : keyJust('KeyR'); }
+export function wantsWaveShield() { return input._scripting ? !!input._script.waveShield : keyJust('KeyG'); }
+export function wantsLaunchpad() { return input._scripting ? !!input._script.launchpad : keyJust('KeyT'); }
 
 export function consumeMouse() {
   const x = input.mouseDx, y = input.mouseDy;

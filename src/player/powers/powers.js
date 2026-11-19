@@ -4,8 +4,8 @@
 //   const powers = createPowers({ bus, physics, scene, player, clock, cfg: powersJson });
 //   // tick, after pawn.update(): powers.update(dt);   input: powers.phaseSkip.trigger(orbit.yaw) etc.
 //
-// Until input.js has actions for these, temporary keys: R Phase-Skip, E Wave-Shield, T Launchpad (cfg.bindKeys=false
-// turns them off).
+// Input lives in src/core/input.js (R Phase-Skip, G Wave-Shield, T Launchpad).
+// The temporary R/E/T handler stays off unless cfg.bindKeys === true.
 import { createPhaseSkip } from './phase-skip.js';
 import { createWaveShield } from './wave-shield.js';
 import { createLaunchpads } from './launchpad.js';
@@ -21,11 +21,11 @@ export function createPowers({ bus, physics, scene, player, clock, cfg = {}, aim
   const yaw = () => aimYaw?.() ?? player.yaw ?? 0;
 
   let offKeys = null;
-  if (cfg.bindKeys !== false && typeof addEventListener === 'function') {
+  if (cfg.bindKeys === true && typeof addEventListener === 'function') {
     const onKey = (e) => {
       if (e.repeat) return;
       if (e.code === 'KeyR') phaseSkip.trigger(yaw());
-      else if (e.code === 'KeyE') waveShield.trigger(yaw());
+      else if (e.code === 'KeyG') waveShield.trigger(yaw());
       else if (e.code === 'KeyT') launchpad.place(yaw());
     };
     addEventListener('keydown', onKey);

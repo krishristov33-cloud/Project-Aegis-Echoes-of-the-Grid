@@ -1,5 +1,6 @@
-// C3 test hooks for tests/physics-game.html: the real game on Rapier + the C3 powers attached from outside.
-// R Phase-Skip · E Wave-Shield · T Launchpad · P drop a thin test wall ahead (phaseable) · O spawn crates.
+// C3 test hooks for tests/physics-game.html: the real game on Rapier.
+// Keys come from the main game (Q Blink · R Phase-Skip · G Wave-Shield · T Launchpad).
+// P drop a thin test wall ahead (phaseable) · O spawn crates.
 import * as THREE from 'three';
 import { createPowers } from '../src/player/powers/powers.js';
 
@@ -8,7 +9,7 @@ const game = window.game;
 const physics = game.physics;
 console.info('[c3] physics world:', physics.world ? 'rapier' : 'aabb');
 const cfg = await fetch('src/data/powers.json').then((r) => r.json());
-const powers = createPowers({ bus: game.bus, physics, scene: game.scene, player: game.player, clock: game.clock, cfg });
+const powers = game.powers || createPowers({ bus: game.bus, physics, scene: game.scene, player: game.player, clock: game.clock, cfg: { ...cfg, bindKeys: false } });
 
 let wallN = 0;
 function testWall(dist = 3, yaw = game.player.yaw) {
@@ -35,11 +36,13 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyO') crates();
 });
 
-let last = performance.now();
-(function loop() {
-  requestAnimationFrame(loop);
-  const now = performance.now();
-  powers.update(Math.min((now - last) / 1000, 0.1));
-  last = now;
-})();
+if (!game.powers) {
+  let last = performance.now();
+  (function loop() {
+    requestAnimationFrame(loop);
+    const now = performance.now();
+    powers.update(Math.min((now - last) / 1000, 0.1));
+    last = now;
+  })();
+}
 window.__phys = { physics, powers, testWall, crates };

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { bus, Events } from './core/events.js';
 import { Time } from './core/time.js';
-import { input, bindInput, endFrame, setScriptedInput, clearScriptedInput, keyJust, wantsBlink } from './core/input.js';
+import { input, bindInput, endFrame, setScriptedInput, clearScriptedInput, keyJust, wantsBlink, wantsPhaseSkip, wantsWaveShield, wantsLaunchpad } from './core/input.js';
 import { loadManifest, loadRole, initAssets, loadProp } from './core/assets.js';
 import { createAudioClock } from './core/audio-clock.js';
 import { PhysicsWorld } from './core/physics.js';
@@ -17,6 +17,7 @@ import { createTempoWidget } from './ui/tempo-widget.js';
 import { initFX } from './fx/index.js';
 import { createEncounters } from './ai/encounters.js';
 import { createBlink } from './player/powers/blink.js';
+import { createPowers } from './player/powers/powers.js';
 import { createMixHealth } from './audio/mixhealth.js';
 import { createSidechain } from './audio/sidechain.js';
 
@@ -120,6 +121,11 @@ async function boot() {
   });
   blink.aimYaw = () => orbit.yaw;
 
+  const c3 = createPowers({
+    bus, physics, scene, player, clock, cfg: { ...powers, bindKeys: false },
+    aimYaw: () => orbit.yaw,
+  });
+
   const levelCtx = { scene, physics, strings, enemiesData, powers, puzzle, tuning, bus, manifest, props, renderer };
   const factories = {
     rooftop: createRooftop,
@@ -168,6 +174,7 @@ async function boot() {
     get ai() { return encounters.ai; },
     encounters,
     blink,
+    powers: c3,
     goto,
     tuning,
     strings,
@@ -188,6 +195,7 @@ async function boot() {
     get ai() { return encounters.ai; },
     get encounters() { return encounters; },
     get blink() { return blink; },
+    get powers() { return c3; },
     Events,
     state() {
       return {
@@ -257,7 +265,11 @@ async function boot() {
     pawn.update(dt, orbit.yaw);
     orbit.update(dt, player.position, physics);
     if (wantsBlink()) blink.trigger(orbit.yaw);
+    if (wantsPhaseSkip()) c3.phaseSkip.trigger(orbit.yaw);
+    if (wantsWaveShield()) c3.waveShield.trigger(orbit.yaw);
+    if (wantsLaunchpad()) c3.launchpad.place(orbit.yaw);
     blink.update(dt);
+    c3.update(dt);
     current?.update?.(dt, player.position, bus);
     flow.update(dt, current);
     encounters.update(dt);
