@@ -26,9 +26,9 @@ assets/manifest.json  every model/clip/audio path
 | **L3** | Greyboxes + level flow (rooftop escape → Cradle → acoustic chamber → boss): rooftop rain/neon first, then Cradle + chamber + boss-arena greyboxes | **Lumen** | Level flow owner |
 | **L4** | Melee combo + Sub-Bass Blast + hit reactions (state machine with crossfades) | **Lumen** | Tied to L2 state machine |
 | **L5** | HUD, tempo widget, DAW upgrade menu | **Lumen** | |
-| **L6** | **Tempo Sync** beat clock + music: `audio-clock.js`, `bpm.js`, `music.js`; configurable BPM so Kris can load his own tracks | **Lumen** | Clock everything else syncs to |
-| **L7** | **Mix-as-health + sidechain duck**: `mixhealth.js`, `sidechain.js`; damage distorts the master, healing cleans it; hits duck enemies for a punish window | **Lumen** | Audio DSP + combat hook |
-| **L8** | **Frame-Drop Blink + ghost decoy**: `fx/blink.js`, `player/powers/blink.js` | **Lumen** | Player power, AI targets the ghost |
+| **C5** (was L6) | **Tempo Sync** beat clock + music: `audio-clock.js`, `bpm.js`, `music.js`; configurable BPM so Kris can load his own tracks; replaces the stub `audio-clock.js` (Claude may edit that one core file for this task) | **Claude** | Clock everything else syncs to |
+| **C6** (was L7) | **Mix-as-health + sidechain duck**: `mixhealth.js`, `sidechain.js`; damage distorts the master, healing cleans it; hits duck enemies for a punish window | **Claude** | Audio DSP + combat hook |
+| **C7** (was L8) | **Frame-Drop Blink + ghost decoy**: `fx/blink.js`, `player/powers/blink.js`; Phase-Skip stays in C3 | **Claude** | Player power, AI targets the ghost |
 | **C1** | **Enemy AI** on a navmesh: perception (sight cone, hearing), cover-point generation, squad tactics (suppress + flank, callouts as bus events), Directorate soldier + drone behaviours; navmesh via `three-pathfinding` or `recast-navigation-js` | **Claude** | Hardest gameplay system |
 | **C2** | **Dissonant Hulk boss**: 3 phases, thrown floor chunks, destructible floor, gravity well, weak points that open only when ducked on-beat | **Claude** | Depends on C1 and C3 |
 | **C3** | **Physics layer with Rapier**: replace the box-collider API; Phase-Skip through walls and bullets; Wave-Shield floor extrusion in `geo-extrude.js`; Resonant Launchpad | **Claude** | Math + collision heavy |
@@ -40,7 +40,7 @@ assets/manifest.json  every model/clip/audio path
 
 Lumen also merges Claude's PRs into `main` after a playable check.
 
-**Order**: L1 → (L2 ∥ C1) → (L3 ∥ C3) → (L4 ∥ C4 ∥ L6) → (L5 ∥ L7 ∥ L8) → C2. Aether joins once L2 runs.
+**Order**: L1–L4 done (on main). Claude's queue: **C1 → C5 → C6 → C7 → C3 → C2 → C4**. Lumen (capped until usage resets): L5 HUD, PR review/merge. Aether joins once L2 runs.
 
 ## Contracts (event bus, `src/core/events.js`)
 ```js
