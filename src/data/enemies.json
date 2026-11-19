@@ -1,0 +1,7 @@
+{
+  "note": "Krea owns values (K1). Placeholder stats so L4 combat and C1 AI can wire against the same shape.",
+  "soldier": { "hp": 60, "speed": 3.2, "damage": 8, "hearRadius": 14, "sightRange": 22, "sightConeDeg": 70 },
+  "drone": { "hp": 25, "speed": 5.5, "damage": 5, "hearRadius": 10, "sightRange": 18, "sightConeDeg": 360 },
+  "hulk": { "hp": 1200, "phases": 3 },
+  "dummy": { "hp": 80, "speed": 0, "damage": 0 }
+}

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project Aegis: Echoes of the Grid</title>
+<style>
+:root{--bg:#05070c;--cyan:#3df0ff;--mag:#ff3d8a;--txt:#d6f7ff;--dim:#7aa0ae;--panel:rgba(6,10,18,.72)}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:ui-sans-serif,system-ui,sans-serif;user-select:none}
+canvas#gl{display:block;position:fixed;inset:0;width:100%;height:100%}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5}
+#hud-debug{position:absolute;left:14px;top:12px;margin:0;font:600 12px/1.45 ui-monospace,Menlo,Consolas,monospace;background:var(--panel);padding:10px 12px;border-left:3px solid var(--cyan);letter-spacing:.04em;text-shadow:0 0 8px #012;min-width:200px}
+#prompt{position:absolute;left:50%;top:62%;transform:translateX(-50%);display:none;font:800 14px system-ui;background:var(--panel);padding:6px 12px;border-left:3px solid var(--mag);letter-spacing:.08em}
+#loading{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:#05070c;font:800 18px system-ui;letter-spacing:.28em;color:var(--cyan)}
+.overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(4,8,14,.55);pointer-events:auto}
+.hidden{display:none!important}
+.card{text-align:center;max-width:640px;padding:28px}
+.card h1{margin:0;font:900 42px/1.05 system-ui;letter-spacing:.08em}
+.card h1 span{color:var(--cyan)}
+.card .sub{color:var(--mag);font:800 13px system-ui;letter-spacing:.42em;margin:8px 0 16px}
+.card p{color:var(--dim);line-height:1.5;margin:8px auto;max-width:520px}
+.btn{pointer-events:auto;cursor:pointer;border:0;background:var(--cyan);color:#041018;font:900 14px system-ui;letter-spacing:.1em;padding:10px 18px;box-shadow:4px 4px 0 #000,0 0 18px #3df0ff66}
+.btn:hover{filter:brightness(1.1)}
+#err{display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:40;background:#2a0008;color:#fff;padding:12px;border-left:3px solid var(--mag);white-space:pre-wrap;font:13px/1.4 ui-monospace,Menlo,monospace}
+kbd{display:inline-block;background:var(--txt);color:#041018;padding:0 5px;font:900 11px/16px system-ui;border-radius:2px;margin:0 2px}
+#vign{position:fixed;inset:0;pointer-events:none;z-index:3;background:radial-gradient(ellipse at center,transparent 50%,rgba(4,8,16,.55) 100%)}
+</style>
+<script>
+(function(){
+  var CDNS=[['unpkg','https://unpkg.com/three@0.164.1/'],['jsdelivr','https://cdn.jsdelivr.net/npm/three@0.164.1/']];
+  var q=location.search.match(/[?&]cdn=(\d)/),ci=q?Math.min(+q[1],CDNS.length-1):0,cdn=CDNS[ci];
+  window.AG_CDN={i:ci,name:cdn[0],base:cdn[1]};
+  var im=document.createElement('script');im.type='importmap';
+  im.textContent=JSON.stringify({imports:{'three':cdn[1]+'build/three.module.js','three/addons/':cdn[1]+'examples/jsm/'}});
+  document.currentScript.after(im);
+  window.addEventListener('error',function(e){
+    if(e&&e.target&&e.target!==window){return;}
+    var d=document.getElementById('err'); if(!d)return;
+    d.style.display='block';
+    d.textContent=(d.textContent?d.textContent+'\n':'')+(e.message||e)+' '+(e.filename||'')+':'+(e.lineno||'');
+  },true);
+  window.addEventListener('unhandledrejection',function(e){
+    var r=e.reason; if(r&&(r.name==='NotAllowedError'||r.name==='AbortError'))return;
+    var d=document.getElementById('err'); if(!d)return;
+    d.style.display='block'; d.textContent='Unhandled: '+(r&&r.message||r);
+  });
+  var failed=false;
+  function bootFail(){
+    if(window.__AG_BOOTED||failed)return; failed=true;
+    if(ci+1<CDNS.length&&!/[?&]cdn=/.test(location.search)){
+      var sp=new URLSearchParams(location.search); sp.set('cdn',String(ci+1));
+      location.replace(location.pathname+'?'+sp.toString()+location.hash); return;
+    }
+    var d=document.getElementById('err'); if(d){d.style.display='block'; d.textContent='The game did not start. Allow unpkg or jsDelivr and reload.';}
+  }
+  window.addEventListener('load',function(){setTimeout(bootFail,20000);});
+})();
+</script>
+</head>
+<body>
+<canvas id="gl" tabindex="0"></canvas>
+<div id="vign"></div>
+<div id="loading">AEGIS · LOADING</div>
+<div id="hud">
+  <pre id="hud-debug"></pre>
+  <div id="prompt"></div>
+</div>
+<div id="start" class="overlay hidden">
+  <div class="card">
+    <h1>PROJECT <span>AEGIS</span></h1>
+    <div class="sub" id="subtitle-text">ECHOES OF THE GRID</div>
+    <p id="title-text"></p>
+    <p><kbd>WASD</kbd> move · <kbd>Shift</kbd> sprint · <kbd>Ctrl</kbd> walk · <kbd>Space</kbd> jump / vault<br>
+       <kbd>LMB</kbd> / <kbd>J</kbd> melee combo · <kbd>F</kbd> Sub-Bass Blast · mouse look<br>
+       <span style="opacity:.7">?debug=1 · keys 1–4 switch rooftop / Cradle / chamber / arena</span></p>
+    <button class="btn" id="bStart" type="button">CLICK TO START</button>
+  </div>
+</div>
+<div id="err"></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

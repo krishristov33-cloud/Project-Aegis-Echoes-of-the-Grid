@@ -1,0 +1,106 @@
+{
+  "player": {
+    "height": 1.8,
+    "radius": 0.32,
+    "walkSpeed": 1.4,
+    "jogSpeed": 2.8,
+    "runSpeed": 5.0,
+    "sprintSpeed": 7.5,
+    "accel": 14,
+    "decel": 16,
+    "airAccel": 5,
+    "jumpSpeed": 6.8,
+    "gravity": 22,
+    "maxSlopeDeg": 50,
+    "stepHeight": 0.38,
+    "vaultHeight": 1.15,
+    "vaultMinHeight": 0.45,
+    "vaultDepth": 1.5,
+    "vaultDuration": 0.55,
+    "coyoteTime": 0.12,
+    "jumpBuffer": 0.12,
+    "hpMax": 100,
+    "turnRateDeg": 720,
+    "airControl": 0.45
+  },
+  "camera": {
+    "distance": 5.8,
+    "height": 1.45,
+    "shoulder": 0.4,
+    "minDistance": 1.6,
+    "pitchMin": -0.4,
+    "pitchMax": 1.15,
+    "sensitivity": 0.0022,
+    "fov": 60,
+    "collisionPad": 0.22,
+    "pullLambda": 14,
+    "returnLambda": 6
+  },
+  "loco": {
+    "clipSpeeds": {
+      "idle": 0,
+      "walk": 1.4,
+      "jog": 2.8,
+      "run": 5.0,
+      "sprint": 7.5
+    },
+    "blendLambda": 14,
+    "speedLambdaUp": 7,
+    "speedLambdaDown": 9,
+    "leanGain": 0.06,
+    "maxLean": 16
+  },
+  "ik": {
+    "footSole": 0.08,
+    "rayUp": 0.55,
+    "rayDown": 0.75,
+    "maxHipDrop": 0.2,
+    "plantLift": 0.04,
+    "plantRange": 0.2
+  },
+  "combat": {
+    "meleeRange": 1.9,
+    "meleeAngleDeg": 100,
+    "meleeDamage": [
+      12,
+      16,
+      24
+    ],
+    "meleeDuration": [
+      0.42,
+      0.44,
+      0.62
+    ],
+    "meleeCancel": [
+      0.2,
+      0.22,
+      0.36
+    ],
+    "blastRange": 8,
+    "blastAngleDeg": 55,
+    "blastDamage": 28,
+    "blastKnockback": 14,
+    "blastCooldown": 2.5,
+    "hitStun": 0.4,
+    "onBeatWindow": 0.12,
+    "onBeatMult": 1.5,
+    "sidechainStrengthMelee": 0.6,
+    "sidechainStrengthBlast": 1,
+    "duckWindow": 0.35
+  },
+  "audio": {
+    "bpm": 174,
+    "beatsPerBar": 4
+  },
+  "rain": {
+    "count": 1100,
+    "area": 42,
+    "speed": 16,
+    "size": 0.07,
+    "height": 16
+  },
+  "levels": {
+    "voidY": -24,
+    "respawnDelay": 0.6
+  }
+}

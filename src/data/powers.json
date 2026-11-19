@@ -1,0 +1,7 @@
+{
+  "note": "Krea owns values (K1). L8 and C3 read these once implemented.",
+  "blink": { "distance": 15, "cooldown": 2.8, "ghostLife": 2.5 },
+  "phaseSkip": { "duration": 0.35, "cooldown": 3.2 },
+  "waveShield": { "height": 1.8, "duration": 4, "cooldown": 8 },
+  "launchpad": { "impulse": 14, "duration": 6 }
+}
