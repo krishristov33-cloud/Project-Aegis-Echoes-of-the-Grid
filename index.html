@@ -24,6 +24,27 @@ canvas#gl{display:block;position:fixed;inset:0;width:100%;height:100%}
 #err{display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:40;background:#2a0008;color:#fff;padding:12px;border-left:3px solid var(--mag);white-space:pre-wrap;font:13px/1.4 ui-monospace,Menlo,monospace}
 kbd{display:inline-block;background:var(--txt);color:#041018;padding:0 5px;font:900 11px/16px system-ui;border-radius:2px;margin:0 2px}
 #vign{position:fixed;inset:0;pointer-events:none;z-index:3;background:radial-gradient(ellipse at center,transparent 50%,rgba(4,8,16,.55) 100%)}
+
+#hud-chrome{position:absolute;inset:0;pointer-events:none}
+#hud-banner{position:absolute;top:7%;left:50%;transform:translateX(-50%);text-align:center;letter-spacing:.28em;text-shadow:0 0 18px #012,0 0 8px #3df0ff88;min-width:320px}
+#hud-banner .banner-pre{font:800 11px/1.2 system-ui;color:var(--mag);margin-bottom:6px}
+#hud-banner .banner-main{font:900 22px/1.1 system-ui;color:var(--txt)}
+#hud-hp{position:absolute;left:18px;bottom:20px;width:260px;--hp-flash:0}
+#hud-hp .hp-label{font:800 11px/1 system-ui;letter-spacing:.2em;color:var(--cyan);margin-bottom:6px;text-shadow:0 0 8px #012}
+#hud-hp .hp-track{height:10px;background:rgba(8,14,22,.72);border:1px solid rgba(61,240,255,.35);box-shadow:0 0 12px #3df0ff22, inset 0 0 0 1px #000}
+#hud-hp .hp-fill{height:100%;width:100%;background:linear-gradient(90deg,#1aa8b8,var(--cyan));box-shadow:0 0 10px #3df0ff88;transition:width .12s linear}
+#hud-hp .hp-fill.low{background:linear-gradient(90deg,#8a1038,var(--mag));box-shadow:0 0 10px #ff3d8a88}
+#hud-hp .hp-val{margin-top:5px;font:700 11px/1 ui-monospace,Menlo,monospace;color:var(--dim)}
+#hud-hp{filter:drop-shadow(0 0 calc(var(--hp-flash)*16px) #ff3d8a)}
+#hud-callout{position:absolute;left:50%;bottom:14%;transform:translateX(-50%);max-width:640px;text-align:center;font:700 16px/1.35 system-ui;color:var(--txt);background:var(--panel);padding:8px 16px;border-left:3px solid var(--mag);letter-spacing:.04em;text-shadow:0 0 8px #012}
+#hud-tempo{position:absolute;right:18px;bottom:16px;width:92px;height:92px;transform:scale(var(--pulse-scale,1));transform-origin:center;--pulse-scale:1}
+#hud-tempo svg{width:92px;height:92px;display:block;filter:drop-shadow(0 0 8px #3df0ff66)}
+#hud-tempo .ring-track{fill:none;stroke:rgba(61,240,255,.2);stroke-width:6}
+#hud-tempo .ring-phase{fill:none;stroke:var(--cyan);stroke-width:6;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%}
+#hud-tempo .ring-pulse{fill:none;stroke:var(--mag);stroke-width:2}
+#hud-tempo .tempo-bpm{position:absolute;inset:0 0 22px;display:flex;align-items:center;justify-content:center;font:900 18px/1 system-ui;color:var(--txt);text-shadow:0 0 8px #012}
+#hud-tempo .tempo-label{position:absolute;left:0;right:0;bottom:18px;text-align:center;font:800 8px/1 system-ui;letter-spacing:.18em;color:var(--cyan)}
+#hud-tempo.on-beat .tempo-bpm{color:var(--cyan)}
 </style>
 <script>
 (function(){
@@ -31,7 +52,15 @@ kbd{display:inline-block;background:var(--txt);color:#041018;padding:0 5px;font:
   var q=location.search.match(/[?&]cdn=(\d)/),ci=q?Math.min(+q[1],CDNS.length-1):0,cdn=CDNS[ci];
   window.AG_CDN={i:ci,name:cdn[0],base:cdn[1]};
   var im=document.createElement('script');im.type='importmap';
-  im.textContent=JSON.stringify({imports:{'three':cdn[1]+'build/three.module.js','three/addons/':cdn[1]+'examples/jsm/'}});
+  im.textContent=JSON.stringify({imports:{
+    'three':cdn[1]+'build/three.module.js',
+    'three/addons/':cdn[1]+'examples/jsm/',
+    'recast-navigation':'https://cdn.jsdelivr.net/npm/recast-navigation@0.43.1/index.mjs',
+    '@recast-navigation/core':'https://cdn.jsdelivr.net/npm/@recast-navigation/core@0.43.1/dist/index.mjs',
+    '@recast-navigation/generators':'https://cdn.jsdelivr.net/npm/@recast-navigation/generators@0.43.1/dist/index.mjs',
+    '@recast-navigation/three':'https://cdn.jsdelivr.net/npm/@recast-navigation/three@0.43.1/dist/index.mjs',
+    '@recast-navigation/wasm':'https://cdn.jsdelivr.net/npm/@recast-navigation/wasm@0.43.1/dist/recast-navigation.wasm-compat.js'
+  }});
   document.currentScript.after(im);
   window.addEventListener('error',function(e){
     if(e&&e.target&&e.target!==window){return;}

@@ -12,6 +12,9 @@ import { createCradle } from './world/cradle.js';
 import { createChamber } from './world/chamber.js';
 import { createArena } from './world/arena.js';
 import { createHud } from './ui/hud.js';
+import { createTempoWidget } from './ui/tempo-widget.js';
+import { bootLevelAI, tickEnemyViews } from './world/ai-hook.js';
+import { initFX } from './fx/index.js';
 import { createMixHealth } from './audio/mixhealth.js';
 import { createSidechain } from './audio/sidechain.js';
 
@@ -63,7 +66,8 @@ async function boot() {
   createMixHealth(bus);
   createSidechain(bus);
 
-  const hud = createHud({ root: document.getElementById('hud'), strings });
+  const hud = createHud({ root: document.getElementById('hud'), strings, bus, debug: DEBUG });
+  const tempo = createTempoWidget({ root: document.getElementById('hud'), bus, strings });
   const titleEl = document.getElementById('title-text');
   const subEl = document.getElementById('subtitle-text');
   if (titleEl) titleEl.textContent = strings.title || 'Project Aegis';
@@ -84,6 +88,11 @@ async function boot() {
   let loadedSoldier = null;
   try { loadedSoldier = await loadRole('soldier', manifest); }
   catch (err) { console.warn('[aegis] soldier load failed', err); }
+  let loadedDrone = null;
+  try {
+    loadedDrone = await loadRole('drone', manifest);
+    if (!loadedDrone?.entry?.url) loadedDrone = null;
+  } catch (err) { console.warn('[aegis] drone load failed', err); }
 
   const enemies = [];
   const getEnemies = () => enemies;
@@ -103,23 +112,43 @@ async function boot() {
     arena: createArena,
   };
   let current = null;
+  let gotoToken = 0;
 
-  function goto(name) {
+  async function goto(name) {
     if (!factories[name]) { console.warn('unknown level', name); return; }
+    const token = ++gotoToken;
     if (current) {
+      current.ai?.dispose();
+      current.ai = null;
       enemies.length = 0;
       current.unload();
+      current = null;
     }
-    current = factories[name](levelCtx);
+    const level = factories[name](levelCtx);
+    current = level;
     if (current.enemies) enemies.push(...current.enemies);
-    if (current.fog) {
-      scene.fog = new THREE.Fog(current.fog.color, current.fog.near, current.fog.far);
-      renderer.setClearColor(current.clearColor ?? current.fog.color, 1);
+    if (level.fog) {
+      scene.fog = new THREE.Fog(level.fog.color, level.fog.near, level.fog.far);
+      renderer.setClearColor(level.clearColor ?? level.fog.color, 1);
     }
-    pawn.setSpawn(current.spawn);
-    pawn.face(current.faceYaw ?? 0, true);
-    orbit.setLook(current.faceYaw ?? 0, 0.28);
+    pawn.setSpawn(level.spawn);
+    pawn.face(level.faceYaw ?? 0, true);
+    orbit.setLook(level.faceYaw ?? 0, 0.28);
     bus.emit('levelState', { level: name, phase: 'enter' });
+    if (level.navMeshes?.length && level.spawns?.length) {
+      try {
+        const ai = await bootLevelAI(level, {
+          bus, player, enemiesData, strings, loadedSoldier, loadedDrone,
+        });
+        if (token !== gotoToken) { ai?.dispose(); return; }
+        if (ai) {
+          enemies.length = 0;
+          enemies.push(...ai.enemies);
+        }
+      } catch (err) {
+        console.warn('[aegis] AI boot failed', err);
+      }
+    }
   }
 
   // game.player contract + debug hooks
@@ -134,6 +163,7 @@ async function boot() {
     clock,
     input,
     get level() { return current?.name; },
+    get ai() { return current?.ai || null; },
     goto,
     tuning,
     strings,
@@ -141,6 +171,7 @@ async function boot() {
     enemies,
   };
   window.game = game;
+  const fx = initFX(game);
   window.AG = {
     version: '0.1.0',
     ready: false,
@@ -150,6 +181,7 @@ async function boot() {
     get bus() { return bus; },
     get game() { return game; },
     get clock() { return clock; },
+    get ai() { return current?.ai || null; },
     Events,
     state() {
       return {
@@ -165,6 +197,7 @@ async function boot() {
         bpm: clock.getBpm(),
         phase: clock.getPhase(),
         onBeat: clock.isOnBeat(),
+        enemies: enemies.length,
       };
     },
     tp(x, z, y) {
@@ -216,7 +249,10 @@ async function boot() {
 
     pawn.update(dt, orbit.yaw);
     orbit.update(dt, player.position, physics);
+    current?.ai?.update(dt);
+    tickEnemyViews(current?.ai, dt);
     current?.update?.(dt, player.position, bus);
+    fx.update(dt);
 
     if (portalLock > 0) portalLock -= dt;
     if (current?.portals && portalLock <= 0) {
@@ -245,7 +281,9 @@ async function boot() {
       bpm: clock.getBpm(),
       phase: clock.getPhase(),
       onBeat: clock.isOnBeat(),
+      dt,
     });
+    tempo.update(dt);
     endFrame();
     if (!AG.ready) { AG.ready = true; window.__AG_BOOTED = true; }
   }

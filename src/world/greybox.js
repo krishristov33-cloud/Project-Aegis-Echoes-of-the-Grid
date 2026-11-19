@@ -127,3 +127,27 @@ export function createDummyEnemy({ id = 'dummy-0', position, hp = 80, color = 0x
   };
   return enemy;
 }
+
+/** Collect walkable floors and cover/LOS obstacles for Claude's createAI navmesh. */
+export function createNavBuckets() {
+  const walkables = [];
+  const obstacles = [];
+  return {
+    walkables,
+    obstacles,
+    collect(opts, mesh) {
+      if (!mesh) return;
+      const ud = opts.userData || {};
+      if (ud.ground) walkables.push(mesh);
+      // walls, parapets, and vaultable crates/ledges become occluders + cover
+      if (ud.solid && (!ud.ground || ud.vaultable)) obstacles.push(mesh);
+    },
+    asLevel() {
+      return {
+        navMeshes: [...walkables, ...obstacles],
+        occluders: obstacles.slice(),
+        coverMeshes: obstacles.slice(),
+      };
+    },
+  };
+}

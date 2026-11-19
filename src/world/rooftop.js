@@ -1,13 +1,14 @@
 // Sofia rooftop escape greybox. Mood from Krea's 00_master: rainy-night teal fog,
 // wet concrete, magenta/cyan amuNet neon on a glass tower, warm apartment windows.
 import * as THREE from 'three';
-import { addBox, makeMat, wetGridTexture, neonSign, createDummyEnemy } from './greybox.js';
+import { addBox, makeMat, wetGridTexture, neonSign, createNavBuckets } from './greybox.js';
 import { createRain } from './rain.js';
 
 export function createRooftop(ctx) {
-  const { scene, physics, strings, enemiesData, loadedSoldier } = ctx;
+  const { scene, physics, strings } = ctx;
   const group = new THREE.Group(); group.name = 'rooftop';
   const ids = [];
+  const nav = createNavBuckets();
   const mats = {
     concrete: makeMat({ color: 0x1a222e, roughness: 0.28, metalness: 0.22 }),
     wet: (() => {
@@ -23,6 +24,7 @@ export function createRooftop(ctx) {
   const box = (opts) => {
     const r = addBox({ group, physics, mats }, opts);
     if (r.id) ids.push(r.id);
+    nav.collect(opts, r.mesh);
     return r;
   };
 
@@ -75,7 +77,7 @@ export function createRooftop(ctx) {
   }
 
   // Ramp up to a short raised platform (slopes)
-  const ramp = addBox({ group, physics, mats }, {
+  box({
     id: 'ramp',
     size: [2.4, 0.22, 5.2],
     pos: [-7.5, 0.55, 1.2],
@@ -83,7 +85,6 @@ export function createRooftop(ctx) {
     mat: mats.concrete,
     userData: { solid: true, ground: true },
   });
-  if (ramp.id) ids.push(ramp.id);
   box({ size: [2.6, 0.3, 2.4], pos: [-7.5, 1.2, 4.4], mat: mats.concrete, userData: { solid: true, ground: true } });
 
   // Lower connecting roof (+Z) — a drop / later escape path
@@ -160,23 +161,16 @@ export function createRooftop(ctx) {
   // Fog is set on the scene in load()
   const rain = createRain(ctx.tuning, group);
 
-  // Training dummy (Enemy API, not C1 AI) — Soldier if loaded
-  const dummyPos = new THREE.Vector3(3.2, 0, 5.0);
-  const dummy = createDummyEnemy({
-    id: 'dummy-rooftop',
-    position: dummyPos,
-    hp: (enemiesData && enemiesData.dummy && enemiesData.dummy.hp) || 80,
-    visual: loadedSoldier && !loadedSoldier.fallback ? loadedSoldier.root : null,
-  });
-  group.add(dummy.object);
-  if (loadedSoldier?.gltf && !loadedSoldier.fallback) {
-    try {
-      const mix = new THREE.AnimationMixer(loadedSoldier.root);
-      const idleName = loadedSoldier.clipMap?.idle;
-      const clip = idleName && loadedSoldier.clips[idleName];
-      if (clip) { const a = mix.clipAction(clip); a.play(); dummy._mixer = mix; }
-    } catch (e) { /* visual only */ }
-  }
+  // C1 AI spawns (soldiers replace the old training dummy). Wired in main via bootLevelAI.
+  // Lower connecting roof only: keeps the main-deck vault/sprint lane clear of incoming fire
+  // so L1–L4 locomotion tests are not interrupted by hit reactions.
+  const V = (x, z) => [x, 0, z];
+  const spawns = [
+    { kind: 'soldier', position: V(4.2, 16.5), patrol: [V(4.2, 16.5), V(5.8, 19.5)], yaw: 0 },
+    { kind: 'soldier', position: V(-4.2, 16.5), patrol: [V(-4.2, 16.5), V(-5.8, 19.5)], yaw: 0 },
+    { kind: 'soldier', position: V(0.0, 19.2), patrol: [V(-5.0, 19.2), V(5.0, 19.2)], yaw: 0 },
+    { kind: 'drone', position: V(0, 17), patrol: [V(-5.5, 15), V(5.5, 15), V(5.5, 20), V(-5.5, 20)] },
+  ];
 
   const spawn = new THREE.Vector3(0, 0, 0);
   const portals = [
@@ -190,16 +184,16 @@ export function createRooftop(ctx) {
     spawn,
     faceYaw: 0,
     portals,
-    enemies: [dummy],
+    enemies: [],
     rain,
     physicsIds: ids,
+    ...nav.asLevel(),
+    spawns,
     fog: { color: 0x0a141c, near: 8, far: 70 },
     clearColor: 0x070c12,
     update(dt, playerPos) {
       rain.setOrigin(playerPos);
       rain.update(dt);
-      dummy.update(dt);
-      if (dummy._mixer) dummy._mixer.update(dt);
     },
     unload() {
       rain.dispose();
