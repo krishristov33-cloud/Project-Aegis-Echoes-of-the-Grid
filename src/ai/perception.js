@@ -152,10 +152,11 @@ export class Perception {
     if (this.awareness < 1) this.lastKnown = (this.lastKnown ?? new THREE.Vector3()).copy(this.lastHeard.pos);
   }
 
-  _onBlink({ from, ghostId }) {
-    // Only agents who were watching the player get fooled: they keep shooting at the ghost frame.
+  _onBlink({ from, ghostId, life }) {
+    // Only agents who were watching the player get fooled: they keep shooting at the ghost frame
+    // for as long as it exists (`life` from C7, longer on beat), else the tuned belief time.
     if (!from || !(this.canSee && this.awareness >= this.cfg.awareness.suspicious)) return;
-    this.ghost = { pos: new THREE.Vector3(from.x, from.y, from.z), until: this._now + this.ghostBelief, id: ghostId };
+    this.ghost = { pos: new THREE.Vector3(from.x, from.y, from.z), until: this._now + (life ?? this.ghostBelief), id: ghostId };
     this.canSee = false;
   }
 }
