@@ -1,19 +1,33 @@
 #!/usr/bin/env python3
 """Headless L1-L4 smoke: model loads, idle->sprint->jump->vault, no console errors, 3 screenshots."""
-import asyncio, json, sys, traceback
+import asyncio, functools, http.server, json, os, socket, sys, threading, traceback
 from pathlib import Path
 
 from playwright.async_api import async_playwright
 
-ROOT = Path("/workspace/aegis-repo")
+ROOT = Path(__file__).resolve().parents[1]
 SHOTS = ROOT / "shots"
 SHOTS.mkdir(exist_ok=True)
 URL = "http://127.0.0.1:8765/index.html?shots=1&debug=1"
 
+
+def ensure_server(port=8765):
+    """Serve the repo root on :port unless something already listens there."""
+    with socket.socket() as s:
+        if s.connect_ex(("127.0.0.1", port)) == 0:
+            return None
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(ROOT))
+    handler.log_message = lambda *a, **k: None
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
 async def main():
     errs = []
+    ensure_server()
     async with async_playwright() as p:
-        browser = await p.chromium.launch(args=[
+        # AEGIS_CHROME=1 uses the installed Chrome instead of Playwright's bundled Chromium
+        browser = await p.chromium.launch(channel="chrome" if os.environ.get("AEGIS_CHROME") else None, args=[
             "--use-gl=angle", "--use-angle=swiftshader",
             "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
         ])

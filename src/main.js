@@ -4,7 +4,7 @@ import { Time } from './core/time.js';
 import { input, bindInput, endFrame, setScriptedInput, clearScriptedInput, keyJust, wantsBlink, wantsPhaseSkip, wantsWaveShield, wantsLaunchpad } from './core/input.js';
 import { loadManifest, loadRole, initAssets, loadProp } from './core/assets.js';
 import { createAudioClock } from './core/audio-clock.js';
-import { PhysicsWorld } from './core/physics.js';
+import { initRapier, RapierWorld } from './physics/rapier-world.js';
 import { createPlayer } from './player/controller.js';
 import { ThirdPersonCamera } from './player/camera.js';
 import { createRooftop } from './world/rooftop.js';
@@ -71,7 +71,8 @@ async function boot() {
     catch (err) { console.warn('[assets] prop', n, err); }
   }));
 
-  const physics = new PhysicsWorld();
+  await initRapier();
+  const physics = new RapierWorld();
   const time = new Time();
   if (SHOTS) time.maxDt = 0.08; // headless swiftshader runs few frames; let sim catch up
   const clock = createAudioClock(bus, tuning);
