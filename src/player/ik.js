@@ -4,6 +4,7 @@
 // (hips, leftUpperLeg, leftLowerLeg, leftFoot, ...). Never hardcode vendor names.
 import * as THREE from 'three';
 import { bindBones, resolveBoneMap } from '../core/bones.js';
+import { critDamp } from './animTuning.js';
 
 const _qa = new THREE.Quaternion();
 const _qb = new THREE.Quaternion();
@@ -50,12 +51,14 @@ export function twoBoneIK(upper, lower, end, target, pole, weight = 1) {
  * After the mixer has posed the skeleton: drop hips to the lower foot and
  * two-bone-IK each planted foot onto a ground raycast.
  */
-export function applyFootIK(root, bones, physics, ikT, weight = 1) {
+export function applyFootIK(root, bones, physics, ikT, weight = 1, dt = 1 / 60) {
   if (weight <= 0.01 || !bones.hips || !physics) return;
   root.updateMatrixWorld(true);
   const hips = bones.hips;
   if (!hips._ikRest) hips._ikRest = hips.position.clone();
   hips.position.copy(hips._ikRest);
+  const hipOff = ikT.hipOffsetY || 0;
+  hips.position.y += hipOff;
 
   const sides = [
     { up: bones.leftUpperLeg, mid: bones.leftLowerLeg, foot: bones.leftFoot, sign: 1 },
@@ -66,27 +69,41 @@ export function applyFootIK(root, bones, physics, ikT, weight = 1) {
   const rayDown = ikT.rayDown ?? 0.75;
   const plantLift = ikT.plantLift ?? 0.04;
   const plantRange = ikT.plantRange ?? 0.2;
+  const st = bones._ikSmooth || (bones._ikSmooth = {
+    hip: { p: 0, v: 0 },
+    plant: [{ p: 0, v: 0 }, { p: 0, v: 0 }],
+    tgtY: [{ p: 0, v: 0, has: false }, { p: 0, v: 0, has: false }],
+  });
 
   const results = [];
-  for (const s of sides) {
+  for (let i = 0; i < sides.length; i++) {
+    const s = sides[i];
     if (!s.up || !s.mid || !s.foot) { results.push(null); continue; }
     const fp = s.foot.getWorldPosition(new THREE.Vector3());
     const origin = fp.clone(); origin.y += rayUp;
     const hit = physics.raycast(origin, new THREE.Vector3(0, -1, 0), rayUp + rayDown, { ground: true });
-    if (!hit) { results.push(null); continue; }
+    if (!hit) {
+      critDamp(st.plant[i], 0, ikT.plantOmega ?? 20, dt);
+      results.push(null);
+      continue;
+    }
     const target = hit.point.clone(); target.y += sole;
+    if (!st.tgtY[i].has) { st.tgtY[i].p = target.y; st.tgtY[i].has = true; }
+    target.y = critDamp(st.tgtY[i], target.y, ikT.targetYOmega ?? 22, dt);
     const lift = fp.y - target.y;
-    const plant = 1 - Math.max(0, Math.min(1, (lift - plantLift) / plantRange));
-    results.push({ s, fp, target, hit, lift, plant: plant * weight });
+    const plantRaw = 1 - Math.max(0, Math.min(1, (lift - plantLift) / plantRange));
+    const plant = critDamp(st.plant[i], plantRaw * weight, ikT.plantOmega ?? 20, dt);
+    results.push({ s, fp, target, hit, lift, plant });
   }
 
-  // Hip drop so the lower planted foot can reach
-  let hipDrop = 0;
+  // Smooth pelvis drop so the lower planted foot can reach without jitter
+  let hipDropTgt = 0;
   for (const r of results) {
     if (!r || r.plant < 0.05) continue;
-    if (r.lift > 0) hipDrop = Math.max(hipDrop, Math.min(ikT.maxHipDrop ?? 0.2, r.lift * r.plant));
+    if (r.lift > 0) hipDropTgt = Math.max(hipDropTgt, Math.min(ikT.maxHipDrop ?? 0.2, r.lift * r.plant));
   }
-  if (hipDrop > 0.001) {
+  const hipDrop = critDamp(st.hip, hipDropTgt, ikT.hipOmega ?? 18, dt);
+  if (Math.abs(hipDrop) > 0.0005) {
     hips.position.y -= hipDrop;
     hips.updateMatrixWorld(true);
     root.updateMatrixWorld(true);
@@ -97,12 +114,11 @@ export function applyFootIK(root, bones, physics, ikT, weight = 1) {
 
   for (const r of results) {
     if (!r || r.plant < 0.02) continue;
-    const hipP = r.s.up.getWorldPosition(new THREE.Vector3());
     const knee = r.s.mid.getWorldPosition(new THREE.Vector3());
     // Pole: existing knee bend, nudged forward so the knee stays ahead of the hip-ankle line
     const pole = knee.clone().addScaledVector(fwd, 0.35);
     pole.y = knee.y;
-    // Re-read target after hip drop: keep world XZ of animated foot, Y of ground
+    // Re-read target after hip drop: keep world XZ of animated foot, Y of (smoothed) ground
     const fp = r.s.foot.getWorldPosition(new THREE.Vector3());
     const target = r.target.clone(); target.x = fp.x; target.z = fp.z;
     twoBoneIK(r.s.up, r.s.mid, r.s.foot, target, pole, r.plant);
