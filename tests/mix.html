@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:," />
+<title>Aegis Mix Health (C6)</title>
+<style>
+  :root { --bg: #05070c; --cyan: #3df0ff; --mag: #ff3d8a; --txt: #d6f7ff; --dim: #7aa0ae; --panel: rgba(6, 10, 18, 0.85); }
+  html, body { margin: 0; background: var(--bg); color: var(--txt); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font: 900 22px system-ui; letter-spacing: 0.08em; margin: 0 0 4px; }
+  .sub { color: var(--dim); margin-bottom: 18px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+  button { font: 700 13px system-ui; background: #0e1726; color: var(--txt); border: 1px solid #23324a; padding: 7px 12px; cursor: pointer; }
+  button.primary { background: var(--cyan); color: #041018; border: 0; }
+  #hp { height: 14px; background: #1a2232; }
+  #hp > div { height: 100%; width: 100%; background: linear-gradient(90deg, var(--mag), var(--cyan)); transition: width 0.15s; }
+  canvas { width: 100%; height: 140px; background: #0a1220; display: block; margin-top: 8px; }
+  #stats { font: 12px/1.5 ui-monospace, Consolas, monospace; color: var(--dim); white-space: pre; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js" } }
+</script>
+</head>
+<body>
+<main>
+  <h1>MIX = HEALTH</h1>
+  <div class="sub">C6 test page: the real clock + music + <code>mixhealth.js</code> + <code>sidechain.js</code> on the real bus. Scope and spectrum are taken after the mix-health chain.</div>
+  <div class="row"><button class="primary" id="start">Start audio</button><span id="state">waiting for audio…</span></div>
+  <div id="hp"><div></div></div>
+  <div class="row">
+    <button id="d10">Hit −10</button><button id="d30">Hit −30</button><button id="h25">Heal +25</button><button id="full">Full heal</button>
+    <button id="melee">Melee sidechain</button><button id="blast">Blast sidechain</button><button id="beatBlast">On-beat blast</button>
+  </div>
+  <canvas id="scope" width="720" height="140"></canvas>
+  <canvas id="spec" width="720" height="140"></canvas>
+  <div id="stats"></div>
+</main>
+<script type="module" src="./mix.js"></script>
+</body>
+</html>
