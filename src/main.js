@@ -292,6 +292,10 @@ async function boot() {
       phase: clock.getPhase(),
       onBeat: clock.isOnBeat(),
       dt,
+      boss: (() => {
+        const h = enemies.find((e) => e.kind === 'hulk' && !e.dead);
+        return h ? { hp: h.hp, hpMax: h.hpMax, weak: !!h.weakOpen } : null;
+      })(),
     });
     tempo.update(dt);
     endFrame();

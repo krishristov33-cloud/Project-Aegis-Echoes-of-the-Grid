@@ -15,6 +15,13 @@ export const Events = Object.freeze({
   phaseSkip: 'phaseSkip',
   waveShield: 'waveShield',
   launchpad: 'launchpad',
+  bossPhase: 'bossPhase',
+  bossTelegraph: 'bossTelegraph',
+  bossAttack: 'bossAttack',
+  bossDefeated: 'bossDefeated',
+  enemyShot: 'enemyShot',
+  enemyHit: 'enemyHit',
+  enemyKilled: 'enemyKilled',
 });
 
 class Bus {

@@ -26,11 +26,38 @@ export function createHud({ root, strings, bus, debug = false }) {
         <div class="hp-val"></div>
       </div>
       <div id="hud-callout" class="hidden"></div>
+      <div id="hud-boss" class="hidden">
+        <div class="boss-label"></div>
+        <div class="boss-track"><div class="boss-fill"></div></div>
+        <div class="boss-weak"></div>
+      </div>
     `;
     root.appendChild(chrome);
   }
+  if (!document.getElementById('hud-boss-style')) {
+    const st = document.createElement('style');
+    st.id = 'hud-boss-style';
+    st.textContent = `
+      #hud-boss{position:absolute;top:18px;left:50%;transform:translateX(-50%);width:min(520px,70vw);text-align:center;pointer-events:none;z-index:6}
+      #hud-boss .boss-label{font:800 11px/1 system-ui;letter-spacing:.28em;color:var(--mag,#ff3d8a);margin-bottom:6px;text-shadow:0 0 8px #012}
+      #hud-boss .boss-track{height:12px;background:rgba(8,8,14,.75);border:1px solid rgba(255,61,138,.45);box-shadow:0 0 12px #ff3d8a22, inset 0 0 0 1px #000}
+      #hud-boss .boss-fill{height:100%;width:100%;background:linear-gradient(90deg,#8a1038,var(--mag,#ff3d8a));box-shadow:0 0 10px #ff3d8a88;transition:width .12s linear}
+      #hud-boss .boss-weak{margin-top:7px;font:900 16px/1 system-ui;letter-spacing:.32em;color:#fff;opacity:0;text-shadow:0 0 14px #ff3d8a;transition:opacity .12s}
+      #hud-boss.weak .boss-weak{opacity:1;animation:bossWeakFlash .16s linear alternate infinite}
+      @keyframes bossWeakFlash{from{opacity:.55;transform:scale(1)}to{opacity:1;transform:scale(1.08)}}
+    `;
+    document.head.appendChild(st);
+  }
   const bannerEl = chrome.querySelector('#hud-banner');
   const calloutEl = chrome.querySelector('#hud-callout');
+  const bossEl = chrome.querySelector('#hud-boss');
+  const bossLabel = chrome.querySelector('#hud-boss .boss-label');
+  const bossFill = chrome.querySelector('#hud-boss .boss-fill');
+  const bossWeak = chrome.querySelector('#hud-boss .boss-weak');
+  if (bossLabel) bossLabel.textContent = S.boss || 'DISSONANT HULK';
+  if (bossWeak) bossWeak.textContent = S.weak || 'WEAK';
+  let weakUntil = 0;
+  let bossVisible = false;
   const hpLabel = chrome.querySelector('.hp-label');
   const hpFill = chrome.querySelector('.hp-fill');
   const hpVal = chrome.querySelector('.hp-val');
@@ -70,6 +97,23 @@ export function createHud({ root, strings, bus, debug = false }) {
     offs.push(bus.on('levelState', ({ level, phase }) => showBanner(level, phase)));
     offs.push(bus.on('callout', ({ text }) => showCallout(text)));
     offs.push(bus.on('playerDamaged', () => { flash = 1; }));
+    offs.push(bus.on('bossPhase', () => { bossVisible = true; bossEl?.classList.remove('hidden'); }));
+    offs.push(bus.on('bossTelegraph', () => { bossVisible = true; bossEl?.classList.remove('hidden'); }));
+    offs.push(bus.on('enemyHit', (p) => {
+      if (p?.kind !== 'hulk') return;
+      bossVisible = true;
+      bossEl?.classList.remove('hidden');
+      if (p.weak) {
+        bossEl?.classList.add('weak');
+        weakUntil = performance.now() + 900;
+      }
+      if (p.hpMax) bossFill && (bossFill.style.width = `${Math.max(0, Math.min(1, (p.hp ?? 0) / p.hpMax)) * 100}%`);
+    }));
+    offs.push(bus.on('bossDefeated', () => {
+      if (bossFill) bossFill.style.width = '0%';
+      bossEl?.classList.remove('weak');
+      setTimeout(() => { bossEl?.classList.add('hidden'); bossVisible = false; }, 1600);
+    }));
   }
 
   return {
@@ -77,7 +121,7 @@ export function createHud({ root, strings, bus, debug = false }) {
     showStart() { if (start) start.classList.remove('hidden'); },
     hideStart() { if (start) start.classList.add('hidden'); },
     setPrompt(t) { if (prompt) { prompt.textContent = t || ''; prompt.style.display = t ? 'block' : 'none'; } },
-    update({ state, speed, fps, grounded, hp, hpMax, model, level, bpm, phase, onBeat, dt = 0 }) {
+    update({ state, speed, fps, grounded, hp, hpMax, model, level, bpm, phase, onBeat, dt = 0, boss = null }) {
       const max = hpMax || 100;
       const cur = Math.max(0, hp ?? 0);
       const pct = Math.max(0, Math.min(1, cur / max));
@@ -96,6 +140,19 @@ export function createHud({ root, strings, bus, debug = false }) {
       if (calloutUntil && now > calloutUntil) {
         calloutEl.classList.add('hidden');
         calloutUntil = 0;
+      }
+      if (boss && boss.hpMax) {
+        bossVisible = true;
+        bossEl?.classList.remove('hidden');
+        if (bossFill) bossFill.style.width = `${Math.max(0, Math.min(1, (boss.hp ?? 0) / boss.hpMax)) * 100}%`;
+        if (boss.weak) {
+          bossEl?.classList.add('weak');
+          weakUntil = Math.max(weakUntil, now + 120);
+        }
+      }
+      if (weakUntil && now > weakUntil) {
+        bossEl?.classList.remove('weak');
+        weakUntil = 0;
       }
       if (debug) {
         const bar = onBeat ? '●' : '○';
