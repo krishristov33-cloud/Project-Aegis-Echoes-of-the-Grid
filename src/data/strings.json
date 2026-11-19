@@ -67,6 +67,11 @@
     "droneDown": [
       "Drone's down!",
       "Lost the overwatch feed!"
+    ],
+    "waveIncoming": [
+      "Drone inbound! More on the roof!",
+      "They've called backup!",
+      "Second wave \u2014 watch the sky!"
     ]
   },
   "title": "Project Aegis: Echoes of the Grid",
@@ -85,8 +90,11 @@
     },
     "phases": {
       "enter": "{level}",
-      "clear": "CLEAR",
+      "clear": "{level} CLEAR",
       "fail": "SIGNAL LOST"
-    }
+    },
+    "boss": "DISSONANT HULK",
+    "weak": "WEAK",
+    "arenaDrop": "ARENA  \u00b7  drop in"
   }
 }

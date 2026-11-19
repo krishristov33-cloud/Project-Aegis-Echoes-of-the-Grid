@@ -47,6 +47,9 @@ export function createPlayer(ctx) {
     _vault: null,
     _landT: 0,
     _spawn: new THREE.Vector3(),
+    _checkpoint: new THREE.Vector3(),
+    _deadT: 0,
+    _iframe: 0,
     applyImpulse(v) {
       this._impulse.add(v);
     },
@@ -63,8 +66,14 @@ export function createPlayer(ctx) {
 
   function setSpawn(p) {
     player._spawn.copy(p);
+    player._checkpoint.copy(p);
     object.position.copy(p);
     player.velocity.set(0, 0, 0);
+    player._deadT = 0;
+  }
+
+  function setCheckpoint(p = object.position) {
+    player._checkpoint.copy(p);
   }
 
   function face(yaw, snap = true) {
@@ -104,11 +113,32 @@ export function createPlayer(ctx) {
   }
 
   function update(dt, camYaw) {
-    if (player.hp <= 0) { player.state = 'dead'; loco.setMove(0); loco.setVertical(0, player.isGrounded); loco.update(dt, { physics, ikTuning: animTuning.ik }); return; }
+    if (player._iframe > 0) player._iframe = Math.max(0, player._iframe - dt);
+
+    if (player.hp <= 0) {
+      player.state = 'dead';
+      player._vault = null;
+      loco.setMove(0);
+      loco.setVertical(0, player.isGrounded);
+      loco.update(dt, { physics, ikTuning: animTuning.ik });
+      player._deadT += dt;
+      if (player._deadT >= 2) {
+        object.position.copy(player._checkpoint);
+        player.velocity.set(0, 0, 0);
+        player.heal(player.hpMax);
+        player.state = 'idle';
+        if (player.combat) player.combat.state = 'idle';
+        player._deadT = 0;
+        player._iframe = 1.25;
+        player.isGrounded = true;
+      }
+      return;
+    }
+    player._deadT = 0;
 
     // respawn if we fell off the world
     if (object.position.y < (tuning.levels?.voidY ?? -24)) {
-      object.position.copy(player._spawn);
+      object.position.copy(player._checkpoint);
       player.velocity.set(0, 0, 0);
     }
 
@@ -160,6 +190,7 @@ export function createPlayer(ctx) {
         player.isGrounded = true;
         loco.ikWeight = 1;
         player._landT = 0.15;
+        setCheckpoint(v.to);
       }
       return;
     }
@@ -254,5 +285,5 @@ export function createPlayer(ctx) {
     else player.state = loco.gaitName();
   }
 
-  return { player, update, setSpawn, face, jump, tryVault, loco, combat, fx };
+  return { player, update, setSpawn, setCheckpoint, face, jump, tryVault, loco, combat, fx };
 }

@@ -8,27 +8,68 @@
     "runSpeed": 4.2,
     "acceleration": 10,
     "turnRate": 8,
-    "sight": { "fov": 110, "range": 28, "peripheralFov": 170, "peripheralRange": 6, "eyeHeight": 1.6, "tickHz": 10 },
-    "hearing": { "multiplier": 1.0 },
-    "awareness": { "gainNear": 3.0, "gainFar": 0.5, "decay": 0.2, "suspicious": 0.3, "forgetAfter": 10 },
+    "sight": {
+      "fov": 110,
+      "range": 28,
+      "peripheralFov": 170,
+      "peripheralRange": 6,
+      "eyeHeight": 1.6,
+      "tickHz": 10
+    },
+    "hearing": {
+      "multiplier": 1.0
+    },
+    "awareness": {
+      "gainNear": 3.0,
+      "gainFar": 0.5,
+      "decay": 0.2,
+      "suspicious": 0.3,
+      "forgetAfter": 10
+    },
     "weapon": {
-      "damage": 7,
+      "damage": 3,
       "rof": 7,
-      "burst": [3, 6],
-      "burstPause": [0.7, 1.5],
+      "burst": [
+        3,
+        6
+      ],
+      "burstPause": [
+        0.7,
+        1.5
+      ],
       "range": 35,
-      "accuracyNear": 0.7,
-      "accuracyFar": 0.15,
+      "accuracyNear": 0.35,
+      "accuracyFar": 0.08,
       "movingTargetPenalty": 0.5,
       "suppressedPenalty": 0.5,
       "magazine": 30,
       "reloadTime": 2.2,
       "noiseRadius": 40,
-      "reactionTime": 0.45
+      "reactionTime": 1.2
     },
-    "cover": { "searchRadius": 16, "preferredMin": 7, "preferredMax": 22, "peekTime": [1.4, 2.6], "hideTime": [0.8, 1.6], "suppressedHideTime": 1.2 },
-    "patrol": { "waitTime": [1.5, 4.0] },
-    "investigate": { "lookTime": 3.0 },
+    "cover": {
+      "searchRadius": 16,
+      "preferredMin": 7,
+      "preferredMax": 22,
+      "peekTime": [
+        1.4,
+        2.6
+      ],
+      "hideTime": [
+        0.8,
+        1.6
+      ],
+      "suppressedHideTime": 1.2
+    },
+    "patrol": {
+      "waitTime": [
+        1.5,
+        4.0
+      ]
+    },
+    "investigate": {
+      "lookTime": 3.0
+    },
     "duckDefault": 1.2,
     "suppressionDecay": 0.6,
     "punishWindow": 0.35
@@ -44,14 +85,36 @@
     "standoff": 11,
     "avoidDistance": 3,
     "fallGravity": 12,
-    "sight": { "fov": 80, "range": 30, "peripheralFov": 140, "peripheralRange": 5, "pitchDown": 35, "eyeHeight": 0, "tickHz": 10 },
-    "hearing": { "multiplier": 0.6 },
-    "awareness": { "gainNear": 4.0, "gainFar": 0.8, "decay": 0.25, "suspicious": 0.3, "forgetAfter": 8 },
+    "sight": {
+      "fov": 80,
+      "range": 30,
+      "peripheralFov": 140,
+      "peripheralRange": 5,
+      "pitchDown": 35,
+      "eyeHeight": 0,
+      "tickHz": 10
+    },
+    "hearing": {
+      "multiplier": 0.6
+    },
+    "awareness": {
+      "gainNear": 4.0,
+      "gainFar": 0.8,
+      "decay": 0.25,
+      "suspicious": 0.3,
+      "forgetAfter": 8
+    },
     "weapon": {
       "damage": 4,
       "rof": 4,
-      "burst": [2, 4],
-      "burstPause": [1.0, 1.8],
+      "burst": [
+        2,
+        4
+      ],
+      "burstPause": [
+        1.0,
+        1.8
+      ],
       "range": 26,
       "accuracyNear": 0.5,
       "accuracyFar": 0.1,
@@ -76,7 +139,8 @@
     "searchRadius": 10,
     "searchPoints": 6,
     "searchDuration": 25,
-    "calloutCooldown": 3.5
+    "calloutCooldown": 3.5,
+    "maxShooters": 2
   },
   "cover": {
     "spacing": 1.2,
@@ -85,14 +149,21 @@
     "highHeight": 1.7,
     "snapMax": 0.8
   },
-  "ghost": { "belief": 2.5 },
-  "noise": { "footstepWalk": 4, "footstepRun": 9, "landing": 8, "shot": 40 },
+  "ghost": {
+    "belief": 2.5
+  },
+  "noise": {
+    "footstepWalk": 4,
+    "footstepRun": 9,
+    "landing": 8,
+    "shot": 40
+  },
   "encounters": {
     "rooftop": {
-      "_note": "Lower connecting roof only, so the main-deck sprint/vault lane stays clear of incoming fire.",
+      "_note": "Short rooftop flow. Wave 1 is 2 soldiers on the lower roof (sprint/vault lane stays clear). Wave 2 (drone + 2 soldiers) is parked by encounter-flow until wave 1 is down.",
       "squads": [
         {
-          "name": "roof-a",
+          "name": "roof-wave1",
           "soldiers": [
             {
               "pos": [
@@ -100,7 +171,7 @@
                 0,
                 16.5
               ],
-              "yaw": 0,
+              "yaw": 3.14,
               "patrol": [
                 [
                   4.2,
@@ -120,7 +191,7 @@
                 0,
                 16.5
               ],
-              "yaw": 0,
+              "yaw": 3.14,
               "patrol": [
                 [
                   -4.2,
@@ -133,14 +204,39 @@
                   19.5
                 ]
               ]
-            },
+            }
+          ]
+        },
+        {
+          "name": "roof-wave2",
+          "soldiers": [
             {
               "pos": [
-                0.0,
+                5.0,
                 0,
                 19.2
               ],
-              "yaw": 0,
+              "yaw": 3.14,
+              "patrol": [
+                [
+                  5.0,
+                  0,
+                  19.2
+                ],
+                [
+                  3.2,
+                  0,
+                  16.0
+                ]
+              ]
+            },
+            {
+              "pos": [
+                -5.0,
+                0,
+                19.2
+              ],
+              "yaw": 3.14,
               "patrol": [
                 [
                   -5.0,
@@ -148,9 +244,9 @@
                   19.2
                 ],
                 [
-                  5.0,
+                  -3.2,
                   0,
-                  19.2
+                  16.0
                 ]
               ]
             }
@@ -339,94 +435,70 @@
       ]
     },
     "arena": {
-      "squads": [
-        {
-          "name": "arena-a",
-          "soldiers": [
-            {
-              "pos": [
-                -10,
-                0,
-                6
-              ],
-              "yaw": 0.4,
-              "patrol": [
-                [
-                  -10,
-                  0,
-                  6
-                ],
-                [
-                  -10,
-                  0,
-                  -6
-                ],
-                [
-                  -4,
-                  0,
-                  10
-                ]
-              ]
-            },
-            {
-              "pos": [
-                10,
-                0,
-                6
-              ],
-              "yaw": -0.4,
-              "patrol": [
-                [
-                  10,
-                  0,
-                  6
-                ],
-                [
-                  10,
-                  0,
-                  -6
-                ],
-                [
-                  4,
-                  0,
-                  10
-                ]
-              ]
-            }
-          ],
-          "drones": [
-            {
-              "pos": [
-                0,
-                0,
-                0
-              ],
-              "patrol": [
-                [
-                  -12,
-                  0,
-                  -12
-                ],
-                [
-                  12,
-                  0,
-                  -12
-                ],
-                [
-                  12,
-                  0,
-                  12
-                ],
-                [
-                  -12,
-                  0,
-                  12
-                ]
-              ]
-            }
-          ]
-        }
-      ]
+      "_note": "Boss arena: Dissonant Hulk only. Spawn faces +Z from (0,0,-10); the Hulk stands at z=6 facing the player.",
+      "boss": {
+        "type": "hulk",
+        "pos": [
+          0,
+          0,
+          6
+        ],
+        "yaw": 3.141592653589793
+      }
     }
+  },
+  "hulk": {
+    "hp": 1200,
+    "radius": 0.9,
+    "height": 3.2,
+    "speed": [
+      1.8,
+      2.4,
+      3.1
+    ],
+    "turnRate": 2.2,
+    "keepDistance": 2.6,
+    "aggroRange": 30,
+    "attackEvery": [
+      4,
+      3,
+      2
+    ],
+    "windupBeats": 2,
+    "phaseAt": [
+      0.66,
+      0.33
+    ],
+    "roarBeats": 4,
+    "armor": 0.1,
+    "weakMult": 2,
+    "weakOpenTime": 1.8,
+    "offBeatDuck": 0.3,
+    "stomp": {
+      "range": 5,
+      "damage": 22,
+      "knockUp": 6,
+      "crackRadius": 6
+    },
+    "throw": {
+      "damage": 20,
+      "radius": 1.8,
+      "flightBeats": 2,
+      "minRange": 6,
+      "chunk": 1.1
+    },
+    "well": {
+      "radius": 13,
+      "pull": 5.5,
+      "coreRadius": 2.6,
+      "coreDamage": 8,
+      "beats": 8,
+      "cooldownBeats": 16
+    },
+    "void": {
+      "damage": 5,
+      "crackBeats": 2
+    },
+    "debrisLife": 8
   }
 }

@@ -338,7 +338,7 @@ export function createRooftop(ctx) {
 
   const spawn = new THREE.Vector3(0, 0, 0);
   const portals = [
-    { to: 'cradle', pos: new THREE.Vector3(0, -2.5, 20), radius: 1.8, label: 'DROP' },
+    { to: 'arena', pos: new THREE.Vector3(0, -2.5, 20), radius: 1.8, label: 'ARENA', locked: true },
   ];
 
   scene.add(group);

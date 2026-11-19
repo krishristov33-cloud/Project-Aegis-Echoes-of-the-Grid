@@ -98,6 +98,8 @@ export class Combat {
   }
 
   takeDamage(amount, src, player) {
+    if (player.hp <= 0) return 0;
+    if (player.invulnerable || (player._iframe ?? 0) > 0) return 0;
     const hpMax = player.hpMax;
     const dealt = Math.max(0, amount);
     player.hp = Math.max(0, player.hp - dealt);

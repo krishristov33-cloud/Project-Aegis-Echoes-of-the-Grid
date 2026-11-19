@@ -8,6 +8,7 @@ import { PhysicsWorld } from './core/physics.js';
 import { createPlayer } from './player/controller.js';
 import { ThirdPersonCamera } from './player/camera.js';
 import { createRooftop } from './world/rooftop.js';
+import { createEncounterFlow } from './world/encounter-flow.js';
 import { createCradle } from './world/cradle.js';
 import { createChamber } from './world/chamber.js';
 import { createArena } from './world/arena.js';
@@ -109,6 +110,9 @@ async function boot() {
     bus, scene, physics, player, enemies, manifest,
     data: { enemies: enemiesData, strings },
   });
+
+  const flow = createEncounterFlow({ bus, scene, player, enemies, strings });
+
 
   const blink = createBlink({
     bus, player, physics, scene, clock, time,
@@ -255,12 +259,14 @@ async function boot() {
     if (wantsBlink()) blink.trigger(orbit.yaw);
     blink.update(dt);
     current?.update?.(dt, player.position, bus);
+    flow.update(dt, current);
     encounters.update(dt);
     fx.update(dt);
 
     if (portalLock > 0) portalLock -= dt;
     if (current?.portals && portalLock <= 0) {
       for (const p of current.portals) {
+        if (p.locked) continue;
         const d = player.position.distanceTo(p.pos);
         if (d < (p.radius ?? 1.6) + 0.4) {
           hud.setPrompt(`${p.label || p.to}  ·  walk in`);
