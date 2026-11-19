@@ -54,7 +54,12 @@ bus.emit('noise', {pos, radius, kind})            // footsteps/shots → C3 hear
 bus.emit('blink', {from, to, ghostId})            // C4 → C3 targets ghost
 bus.emit('callout', {speaker, text, pos})         // C3 → L5 subtitle + audio
 bus.emit('levelState', {level, phase})            // L3/C5
+// added by C1 (Claude, src/ai/):
+bus.emit('enemyShot', {id, from, to, hit, targetGhost})  // tracer / muzzle flash / gunshot sfx (A2, sfx)
+bus.emit('enemyHit', {id, kind, amount, hp, hpMax, pos, src}) // hit reaction anim, hitmarker (A1, L5)
+bus.emit('enemyKilled', {id, kind, pos})                 // death anim, resonance, level flow (A1, L3, L6)
 ```
+Note on the labels above: they predate the final owner split. Current owners: `beat` is L6, `sidechain` comes from L4/L7 and `src/ai/director.js` ducks enemies on it, `noise` is consumed by C1 hearing, `blink` is emitted by L8 and C1 makes enemies shoot the ghost, `callout` is emitted by C1 squads for L5.
 Player API exposed on `game.player`: `position, velocity, isGrounded, hp, state, applyImpulse(v), takeDamage(n, src)`.
 Enemy API: `id, position, hp, state, duck(sec), takeDamage(n, src)`.
 On-beat rule: an action is on-beat if `|phase| < 0.12` or `> 0.88`; damage ×1.5 and a shockwave.

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:," />
+  <title>Aegis AI test (C1)</title>
+  <link rel="stylesheet" href="./harness/harness.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/",
+      "recast-navigation": "https://cdn.jsdelivr.net/npm/recast-navigation@0.43.1/index.mjs",
+      "@recast-navigation/core": "https://cdn.jsdelivr.net/npm/@recast-navigation/core@0.43.1/dist/index.mjs",
+      "@recast-navigation/generators": "https://cdn.jsdelivr.net/npm/@recast-navigation/generators@0.43.1/dist/index.mjs",
+      "@recast-navigation/three": "https://cdn.jsdelivr.net/npm/@recast-navigation/three@0.43.1/dist/index.mjs",
+      "@recast-navigation/wasm": "https://cdn.jsdelivr.net/npm/@recast-navigation/wasm@0.43.1/dist/recast-navigation.wasm-compat.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="hp"><div></div></div>
+  <div id="help" class="panel">
+    <b>C1 enemy AI test</b><br />
+    <kbd>WASD</kbd> move &nbsp;<kbd>Shift</kbd> run (louder steps)<br />
+    <kbd>LMB</kbd> shoot enemy under cursor &nbsp;<kbd>RMB</kbd> orbit camera<br />
+    <kbd>E</kbd> sub-bass blast (sidechain duck, 5 m) &nbsp;<kbd>F</kbd> same, on-beat<br />
+    <kbd>Q</kbd> frame-drop blink (ghost decoy)<br />
+    <kbd>G</kbd> god mode &nbsp;<kbd>H</kbd> heal &nbsp;<kbd>N</kbd> navmesh &nbsp;<kbd>C</kbd> cover points &nbsp;<kbd>V</kbd> sight cones<br />
+    <kbd>R</kbd> reload page
+  </div>
+  <div id="status" class="panel">loading navmesh…</div>
+  <div id="log" class="panel"></div>
+  <div id="subtitle"></div>
+  <div id="crosshair"></div>
+  <script type="module" src="./ai.js"></script>
+</body>
+</html>
