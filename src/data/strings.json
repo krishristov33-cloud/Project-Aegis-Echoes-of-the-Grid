@@ -1,0 +1,22 @@
+{
+  "_note": "Krea owns these. `company` is the single placeholder constant for the company name (rename before release).",
+  "company": "amuNet",
+  "callouts": {
+    "contact": ["Contact! Eyes on the target!", "Got him, front!", "Target spotted!"],
+    "heard": ["Heard something.", "Movement over there.", "You hear that?"],
+    "investigate": ["Checking it out.", "Moving to investigate."],
+    "allClear": ["Must have been nothing.", "Clear. Back to patrol."],
+    "suppressing": ["Suppressing!", "Keep his head down!", "Covering fire!"],
+    "flankLeft": ["Flanking left!", "Moving left, cover me!"],
+    "flankRight": ["Flanking right!", "Going right, keep him busy!"],
+    "moving": ["Moving!", "Changing position!"],
+    "reloading": ["Reloading!", "Mag out, cover me!"],
+    "lostVisual": ["Lost visual!", "Where did he go?"],
+    "search": ["Spread out, find him!", "Sweep the area!"],
+    "manDown": ["Man down!", "We lost one!"],
+    "ducked": ["My ears!", "Agh, that frequency!"],
+    "decoy": ["He's right there, light him up!"],
+    "droneSpotted": ["Drone has eyes on the target.", "Overwatch marking target."],
+    "droneDown": ["Drone's down!", "Lost the overwatch feed!"]
+  }
+}
