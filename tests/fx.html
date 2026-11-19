@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Aegis · Power VFX demo</title>
+  <style>
+    html,body{margin:0;background:#070c12;color:#d8f4ff;font:14px/1.4 ui-sans-serif,system-ui;overflow:hidden}
+    canvas{display:block;width:100%;height:100%}
+    #help{position:fixed;left:16px;bottom:16px;background:rgba(6,12,18,.72);padding:10px 14px;border:1px solid #1e3a4a;border-radius:6px;pointer-events:none}
+    kbd{display:inline-block;min-width:1.2em;padding:0 4px;border:1px solid #3df0ff;border-radius:3px;color:#3df0ff}
+    #err{display:none;position:fixed;top:8px;left:8px;right:8px;background:#400;color:#fff;padding:8px;white-space:pre-wrap}
+  </style>
+  <script>
+    (function(){
+      var im=document.createElement('script'); im.type='importmap';
+      im.textContent=JSON.stringify({imports:{
+        'three':'https://unpkg.com/three@0.164.1/build/three.module.js',
+        'three/addons/':'https://unpkg.com/three@0.164.1/examples/jsm/'
+      }});
+      document.currentScript.after(im);
+    })();
+    window.addEventListener('error', function(e){
+      var d=document.getElementById('err'); if(!d)return;
+      d.style.display='block';
+      d.textContent=(d.textContent?d.textContent+'\n':'')+(e.message||e);
+    }, true);
+  </script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="err"></div>
+<div id="help">
+  <b>Power VFX</b> — rooftop greybox, number keys<br>
+  <kbd>1</kbd> melee swipe + sparks &nbsp; <kbd>2</kbd> Sub-Bass Blast<br>
+  <kbd>3</kbd> Frame-Drop Blink + ghost &nbsp; <kbd>4</kbd> Phase-Skip streak<br>
+  <kbd>5</kbd> on-beat flash &nbsp; <kbd>6</kbd> Wave-Shield<br>
+  <kbd>7</kbd> Launchpad pulse &nbsp; <kbd>8</kbd> Launchpad burst<br>
+  <kbd>9</kbd> mix-distortion glitch
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { bus, Events } from '../src/core/events.js';
+import { PhysicsWorld } from '../src/core/physics.js';
+import { createRooftop } from '../src/world/rooftop.js';
+import { initFX } from '../src/fx/index.js';
+
+const canvas = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight, false);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+renderer.shadowMap.enabled = true;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(4.2, 2.4, 6.4);
+camera.lookAt(0, 1.0, 0);
+scene.add(camera);
+
+const physics = new PhysicsWorld();
+const roof = createRooftop({
+  scene, physics,
+  strings: { neon: 'amuNet' },
+  enemiesData: { dummy: { hp: 80 } },
+  loadedSoldier: null,
+  tuning: { rain: { count: 400, area: 42, speed: 16, size: 0.07, height: 16 } },
+});
+if (roof.fog) {
+  scene.fog = new THREE.Fog(roof.fog.color, roof.fog.near, roof.fog.far);
+  renderer.setClearColor(roof.clearColor ?? 0x070c12, 1);
+}
+scene.add(roof.group || scene.getObjectByName('rooftop') || new THREE.Group());
+// createRooftop already adds to scene? check — it builds `group` and must scene.add
+if (roof.group && !roof.group.parent) scene.add(roof.group);
+
+const origin = new THREE.Vector3(0, 0, 0);
+const dir = new THREE.Vector3(0, 0, 1);
+const player = { position: origin, yaw: 0, object: { rotation: { y: 0 } } };
+const time = { scale: 1 };
+const game = { scene, bus, camera, time, player, clock: { isOnBeat: () => false, getPhase: () => 0 } };
+const fx = initFX(game);
+window.THREE = THREE;
+window.FX = fx; window.AG = { ready: true, fx, game, bus, Events };
+window.__AG_BOOTED = true;
+
+const keys = {
+  Digit1: () => fx.melee(origin, dir, { onBeat: false }),
+  Digit2: () => fx.blast(origin, dir, { onBeat: true }),
+  Digit3: () => fx.blink(origin.clone(), origin.clone().add(new THREE.Vector3(0, 0, 4))),
+  Digit4: () => fx.phaseSkip(origin.clone().add(new THREE.Vector3(0, 0, -1.5)), origin.clone().add(new THREE.Vector3(0, 0, 3.5))),
+  Digit5: () => fx.beatFlash(origin),
+  Digit6: () => fx.shield(origin, dir, { duration: 3 }),
+  Digit7: () => fx.launchpad(origin, { duration: 4 }),
+  Digit8: () => fx.launch(origin),
+  Digit9: () => fx.setMixDistortion(1),
+};
+addEventListener('keydown', (e) => { keys[e.code]?.(); });
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / Math.max(1, innerHeight);
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight, false);
+});
+
+let last = performance.now() / 1000;
+function tick() {
+  requestAnimationFrame(tick);
+  const now = performance.now() / 1000;
+  const dt = Math.min(0.08, now - last) * (time.scale ?? 1); last = now;
+  roof.update?.(dt, origin);
+  fx.update(dt);
+  renderer.render(scene, camera);
+}
+tick();
+</script>
+</body>
+</html>
