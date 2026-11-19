@@ -171,3 +171,25 @@ export async function loadRole(role, manifest) {
     return { role, entry, root: fallbackMesh(entry.fallback || 'capsule', height, radius, 0xff5a8a), gltf: null, clips: {}, clipMap, boneMap: {}, bones: {}, fallback: true, height, radius };
   }
 }
+
+
+/**
+ * Load a prop from manifest.props (falls back to manifest.roles).
+ * Clones are safe; geometry is shared. Props do not cast shadows.
+ */
+export async function loadProp(name, manifest) {
+  const entry = manifest?.props?.[name] || manifest?.roles?.[name];
+  if (!entry?.url) throw new Error(`unknown prop ${name}`);
+  if (!assetsReady) await initAssets();
+  else await assetsReady;
+  const gltf = await loadGLB(entry.url);
+  const root = gltf.scene.clone(true);
+  placeModel(root, entry);
+  const glow = entry.emissive ?? entry.emissiveIntensity;
+  if (glow) applyEmissiveGlow(root, glow);
+  root.name = name;
+  root.traverse((o) => {
+    if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; }
+  });
+  return { name, entry, root };
+}

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { bus, Events } from './core/events.js';
 import { Time } from './core/time.js';
 import { input, bindInput, endFrame, setScriptedInput, clearScriptedInput, keyJust, wantsBlink } from './core/input.js';
-import { loadManifest, loadRole, initAssets } from './core/assets.js';
+import { loadManifest, loadRole, initAssets, loadProp } from './core/assets.js';
 import { createAudioClock } from './core/audio-clock.js';
 import { PhysicsWorld } from './core/physics.js';
 import { createPlayer } from './player/controller.js';
@@ -62,6 +62,13 @@ async function boot() {
 
   await initAssets(renderer);
 
+  const PROP_NAMES = ['hvac_neon', 'speaker_stack', 'panel_block', 'crate', 'resonance_ring', 'monolith', 'gate_arch'];
+  const props = {};
+  await Promise.all(PROP_NAMES.map(async (n) => {
+    try { props[n] = await loadProp(n, manifest); }
+    catch (err) { console.warn('[assets] prop', n, err); }
+  }));
+
   const physics = new PhysicsWorld();
   const time = new Time();
   if (SHOTS) time.maxDt = 0.08; // headless swiftshader runs few frames; let sim catch up
@@ -109,7 +116,7 @@ async function boot() {
   });
   blink.aimYaw = () => orbit.yaw;
 
-  const levelCtx = { scene, physics, strings, enemiesData, powers, puzzle, tuning, bus };
+  const levelCtx = { scene, physics, strings, enemiesData, powers, puzzle, tuning, bus, manifest, props, renderer };
   const factories = {
     rooftop: createRooftop,
     cradle: createCradle,
@@ -127,9 +134,15 @@ async function boot() {
     const level = factories[name](levelCtx);
     current = level;
     if (level.fog) {
-      scene.fog = new THREE.Fog(level.fog.color, level.fog.near, level.fog.far);
+      scene.fog = (level.fog.density != null)
+        ? new THREE.FogExp2(level.fog.color, level.fog.density)
+        : new THREE.Fog(level.fog.color, level.fog.near, level.fog.far);
       renderer.setClearColor(level.clearColor ?? level.fog.color, 1);
+    } else {
+      scene.fog = null;
     }
+    renderer.toneMappingExposure = level.exposure ?? 1.25;
+    if (level.far) { camera.far = level.far; camera.updateProjectionMatrix(); }
     pawn.setSpawn(level.spawn);
     pawn.face(level.faceYaw ?? 0, true);
     orbit.setLook(level.faceYaw ?? 0, 0.28);

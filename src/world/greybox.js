@@ -57,6 +57,59 @@ export function wetGridTexture(color1 = '#141b28', color2 = '#1e2a3c') {
   return tex;
 }
 
+
+/** Albedo + roughness maps for a wet concrete roof (puddles, grout, neon tint). */
+export function wetRoofMaps() {
+  const S = 512;
+  const albedo = document.createElement('canvas'); albedo.width = albedo.height = S;
+  const rough = document.createElement('canvas'); rough.width = rough.height = S;
+  const a = albedo.getContext('2d');
+  const r = rough.getContext('2d');
+  let s = 0xA3E15;
+  const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0xffffffff; };
+
+  a.fillStyle = '#1b2532'; a.fillRect(0, 0, S, S);
+  r.fillStyle = '#8a8a8a'; r.fillRect(0, 0, S, S);
+  // grit
+  for (let i = 0; i < 6000; i++) {
+    const x = rnd() * S, y = rnd() * S;
+    const n = 18 + rnd() * 28;
+    a.fillStyle = `rgba(${n + 8},${n + 16},${n + 24},${0.12 + rnd() * 0.18})`;
+    a.fillRect(x, y, 1 + rnd() * 2, 1 + rnd() * 2);
+  }
+  // grout grid
+  a.strokeStyle = 'rgba(40,58,74,0.55)'; a.lineWidth = 2;
+  r.strokeStyle = '#b0b0b0'; r.lineWidth = 2;
+  for (let i = 0; i <= 8; i++) {
+    const p = i * (S / 8);
+    a.beginPath(); a.moveTo(p, 0); a.lineTo(p, S); a.stroke();
+    a.beginPath(); a.moveTo(0, p); a.lineTo(S, p); a.stroke();
+    r.beginPath(); r.moveTo(p, 0); r.lineTo(p, S); r.stroke();
+    r.beginPath(); r.moveTo(0, p); r.lineTo(S, p); r.stroke();
+  }
+  // puddles: darker + cyan/magenta tint, low roughness
+  for (let i = 0; i < 18; i++) {
+    const x = rnd() * S, y = rnd() * S;
+    const rx = 28 + rnd() * 70, ry = 16 + rnd() * 40;
+    const magenta = rnd() > 0.5;
+    a.fillStyle = magenta ? 'rgba(70,24,48,0.45)' : 'rgba(20,50,70,0.5)';
+    a.beginPath(); a.ellipse(x, y, rx, ry, rnd() * 3, 0, Math.PI * 2); a.fill();
+    r.fillStyle = '#1a1a1a';
+    r.beginPath(); r.ellipse(x, y, rx * 0.92, ry * 0.92, 0, 0, Math.PI * 2); r.fill();
+  }
+
+  const map = new THREE.CanvasTexture(albedo);
+  const roughnessMap = new THREE.CanvasTexture(rough);
+  for (const tex of [map, roughnessMap]) {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = 4;
+    tex.colorSpace = tex === map ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  }
+  map.repeat.set(6, 5);
+  roughnessMap.repeat.set(6, 5);
+  return { map, roughnessMap };
+}
+
 export function neonSign(text, { color = 0x3df0ff, w = 3.2, h = 0.7 } = {}) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 128;
   const g = c.getContext('2d');
