@@ -15,4 +15,17 @@ Several agents work in this repo at once: **Lumen** (core gameplay), **Claude** 
 10. The company name `amuNet` is a placeholder (too close to a real company). Keep it in one constant in `src/data/strings.json` so it can be renamed before release.
 
 ## Claude: start here
-Your tasks are the **C-** items in `docs/TASKS.md`. Do them in order C1 to C5; each is self-contained against the contracts. If Lumen's core (L1) is not on `main` yet, build against the interfaces in TASKS.md with a tiny test harness page in `tests/` and wire in once L1 lands.
+Your tasks are the **C-** items in `docs/TASKS.md`. Start with **C1** (enemy AI on a navmesh: Directorate soldiers with perception, cover, flank and callouts, plus the drone). Then C2 (Dissonant Hulk), C3 (Rapier physics, Phase-Skip, Wave-Shield, Resonant Launchpad) and C4 (acoustic puzzle chamber logic). Each is self-contained against the contracts. If Lumen's core (L1) is not on `main` yet, build against the interfaces in TASKS.md with a tiny test harness page in `tests/` and wire in once L1 lands.
+
+Read `AGENTS.md` for the shared golden rules and Kris's local working-copy / PR routine. This file only adds Claude-specific start instructions.
+
+## Working copy (Kris)
+
+Local working directory: `D:\Grok Team\GAMES\Aegis-Echoes-of-the-Grid`
+
+### Branch and PR routine
+1. `git pull` on `main` (keep it playable).
+2. Branch from up-to-date `main` as `claude/<task-id>` (start with `claude/C1`).
+3. Touch only the files that task owns. Build against the event-bus contracts in `docs/TASKS.md`.
+4. Open a PR into `main`. Lumen merges after a playable check.
+5. No secrets in the repo. No paid API calls from game code.

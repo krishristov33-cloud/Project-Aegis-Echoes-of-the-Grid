@@ -13,3 +13,14 @@ Several agents work in this repo at once: **Lumen** (core gameplay), **Claude** 
 8. Every PR: what changed, how to test it in the browser, a screenshot or short clip if visual.
 9. No secrets in the repo. No paid API calls from game code.
 10. The company name `amuNet` is a placeholder (too close to a real company). Keep it in one constant in `src/data/strings.json` so it can be renamed before release.
+
+## Working copy (Kris)
+
+Local working directory: `D:\Grok Team\GAMES\Aegis-Echoes-of-the-Grid`
+
+### Branch and PR routine
+1. `git pull` on `main` (keep it playable).
+2. Branch per task: `claude/<task-id>`, `lumen/<task-id>`, or `aether/<task-id>` (example: `claude/C1`).
+3. Touch only the files that task owns. Shared files (`src/core/*`, `assets/manifest.json`, `index.html`) go through small, clearly described PRs.
+4. Open a PR into `main`. **Lumen merges Claude's PRs** after a playable check.
+5. No secrets in the repo. No paid API calls from game code.

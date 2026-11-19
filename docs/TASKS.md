@@ -23,20 +23,24 @@ assets/manifest.json  every model/clip/audio path
 |---|---|---|---|
 | **L1** | Core: boot, loop, input, asset manifest, event bus, third-person camera | **Lumen** (in progress) | Already building it |
 | **L2** | Player controller + locomotion blend space (idle/walk/jog/run/sprint), turn-in-place, jump/land/vault, foot IK (from Kanemori `locomotion.js`) | **Lumen** | In progress |
-| **L3** | Rooftop greybox, rain, neon, then Cradle + chamber greybox | **Lumen** | Level flow owner |
+| **L3** | Greyboxes + level flow (rooftop escape → Cradle → acoustic chamber → boss): rooftop rain/neon first, then Cradle + chamber + boss-arena greyboxes | **Lumen** | Level flow owner |
 | **L4** | Melee combo + Sub-Bass Blast + hit reactions (state machine with crossfades) | **Lumen** | Tied to L2 state machine |
 | **L5** | HUD, tempo widget, DAW upgrade menu | **Lumen** | |
-| **C1** | **Adaptive music engine** (Web Audio): 4 stem layers (sub, mid-bass, drums, leads) crossfaded by Resonance; `audio-clock.js` beat clock exposed on the bus (`beat`, `bar`, phase 0-1); BPM from data, plus offline BPM detection for user-loaded tracks | **Claude** | Hardest timing work; everything syncs to it |
-| **C2** | **Mix-as-health + sidechain**: damage drives a waveshaper/clipper + bitcrush + lowpass on the master; heal cleans it. Player hits emit `sidechain` → enemies' `ducked` window (0.35 s) + audible pump on music | **Claude** | Audio DSP |
-| **C3** | **Enemy AI**: perception (sight cone, hearing), cover-point generation on the greybox, squad tactics (suppress + flank, callouts as bus events), soldier + drone behaviours; navmesh via `three-pathfinding` or `recast-navigation-js` | **Claude** | Hardest gameplay system |
-| **C4** | **Geometry powers**: `geo-extrude.js` for Wave-Shield (floor tiles extrude along normal, collide, decay) and Resonant Launchpad (gravity-vector pad); Phase-Skip collision bypass; Blink with ghost-frame decoy that AI keeps targeting | **Claude** | Math + collision heavy |
-| **C5** | **Dissonant Hulk boss**: 3 phases, rips floor chunks (uses C4 extrude), gravity well, weak points that open only when ducked on-beat | **Claude** | Depends on C1–C4 |
+| **L6** | **Tempo Sync** beat clock + music: `audio-clock.js`, `bpm.js`, `music.js`; configurable BPM so Kris can load his own tracks | **Lumen** | Clock everything else syncs to |
+| **L7** | **Mix-as-health + sidechain duck**: `mixhealth.js`, `sidechain.js`; damage distorts the master, healing cleans it; hits duck enemies for a punish window | **Lumen** | Audio DSP + combat hook |
+| **L8** | **Frame-Drop Blink + ghost decoy**: `fx/blink.js`, `player/powers/blink.js` | **Lumen** | Player power, AI targets the ghost |
+| **C1** | **Enemy AI** on a navmesh: perception (sight cone, hearing), cover-point generation, squad tactics (suppress + flank, callouts as bus events), Directorate soldier + drone behaviours; navmesh via `three-pathfinding` or `recast-navigation-js` | **Claude** | Hardest gameplay system |
+| **C2** | **Dissonant Hulk boss**: 3 phases, thrown floor chunks, destructible floor, gravity well, weak points that open only when ducked on-beat | **Claude** | Depends on C1 and C3 |
+| **C3** | **Physics layer with Rapier**: replace the box-collider API; Phase-Skip through walls and bullets; Wave-Shield floor extrusion in `geo-extrude.js`; Resonant Launchpad | **Claude** | Math + collision heavy |
+| **C4** | **Acoustic puzzle chamber**: `chamber.js` puzzle logic using Krea's `puzzle.json` (Lumen owns the greybox in L3) | **Claude** | Puzzle systems |
 | **A1** | Retarget Mixamo clips, tune blends/foot IK, combat timing (hit-stop, anticipation) | **Aether** | Motion owner |
 | **A2** | VFX: blink datamosh shader, sub-bass cone, shield, Dissonant static-void shader, Light Creator gold geometry | **Aether** | |
 | **K1** | Spec, tuning values, acoustic puzzle design (`puzzle.json`), enemy stats, strings | **Krea** | Design owner |
 | **K2** | Higgsfield 3D models into `assets/` + manifest (7 rigged characters, 10 props) after concepts are approved | **Krea + Lumen** | Credits approved by Kris |
 
-**Order**: L1 → (L2 ∥ C1) → (L3 ∥ C2 ∥ C3) → (L4 ∥ C4) → L5 → C5. Aether joins once L2 runs.
+Lumen also merges Claude's PRs into `main` after a playable check.
+
+**Order**: L1 → (L2 ∥ C1) → (L3 ∥ C3) → (L4 ∥ C4 ∥ L6) → (L5 ∥ L7 ∥ L8) → C2. Aether joins once L2 runs.
 
 ## Contracts (event bus, `src/core/events.js`)
 ```js
