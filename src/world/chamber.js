@@ -1,6 +1,6 @@
 // World Engine acoustic chamber greybox (L3). Puzzle logic is C4 — hook is updatePuzzle().
 import * as THREE from 'three';
-import { addBox, makeMat, createNavBuckets } from './greybox.js';
+import { addBox, makeMat } from './greybox.js';
 
 /** C4: implement acoustic puzzle logic against Krea's src/data/puzzle.json. */
 export function updatePuzzle(/* ctx, dt */) { /* no-op until C4 */ }
@@ -9,13 +9,12 @@ export function createChamber(ctx) {
   const { scene, physics } = ctx;
   const group = new THREE.Group(); group.name = 'chamber';
   const ids = [];
-  const nav = createNavBuckets();
   const mats = {
     obsidian: makeMat({ color: 0x0c1016, roughness: 0.25, metalness: 0.55, emissive: 0x061018, emissiveIntensity: 0.3 }),
     floor: makeMat({ color: 0x10161e, roughness: 0.3, metalness: 0.4 }),
     ring: makeMat({ color: 0x0a1820, roughness: 0.2, metalness: 0.5, emissive: 0x1ee0ff, emissiveIntensity: 0.45 }),
   };
-  const box = (opts) => { const r = addBox({ group, physics, mats }, opts); if (r.id) ids.push(r.id); nav.collect(opts, r.mesh); return r; };
+  const box = (opts) => { const r = addBox({ group, physics, mats }, opts); if (r.id) ids.push(r.id); return r; };
 
   box({ id: 'ch-floor', size: [24, 0.6, 24], pos: [0, -0.3, 0], mat: mats.floor, userData: { solid: true, ground: true }, cast: false });
   // octagonal-ish walls
@@ -40,15 +39,9 @@ export function createChamber(ctx) {
     { to: 'arena', pos: new THREE.Vector3(0, 0, 10.2), radius: 1.6, label: 'HULK' },
     { to: 'cradle', pos: new THREE.Vector3(0, 0, -10.2), radius: 1.6, label: 'CRADLE' },
   ];
-  const V = (x, z) => [x, 0, z];
-  const spawns = [
-    { kind: 'soldier', position: V(-6, 4), patrol: [V(-6, 4), V(-6, -4), V(0, 7)], yaw: 0.6 },
-    { kind: 'soldier', position: V(6, 4), patrol: [V(6, 4), V(6, -4), V(0, 7)], yaw: -0.6 },
-  ];
-
   scene.add(group);
   return {
-    name: 'chamber', group, spawn: new THREE.Vector3(0, 0, -6), faceYaw: 0, portals, enemies: [], physicsIds: ids, ...nav.asLevel(), spawns,
+    name: 'chamber', group, spawn: new THREE.Vector3(0, 0, -6), faceYaw: 0, portals, enemies: [], physicsIds: ids,
     fog: { color: 0x070b12, near: 6, far: 28 }, clearColor: 0x05070c,
     update(dt, playerPos, bus) { updatePuzzle({ ctx, dt, playerPos, bus, group }); },
     unload() { scene.remove(group); for (const id of ids) physics.remove(id); },

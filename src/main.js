@@ -13,8 +13,8 @@ import { createChamber } from './world/chamber.js';
 import { createArena } from './world/arena.js';
 import { createHud } from './ui/hud.js';
 import { createTempoWidget } from './ui/tempo-widget.js';
-import { bootLevelAI, tickEnemyViews } from './world/ai-hook.js';
 import { initFX } from './fx/index.js';
+import { createEncounters } from './ai/encounters.js';
 import { createMixHealth } from './audio/mixhealth.js';
 import { createSidechain } from './audio/sidechain.js';
 
@@ -85,15 +85,6 @@ async function boot() {
     console.warn('[aegis] player load failed', err);
     loadedPlayer = await loadRole('player', { roles: { player: { url: null, fallback: 'capsule', height: 1.8, radius: 0.32, clipMap: {} } } });
   }
-  let loadedSoldier = null;
-  try { loadedSoldier = await loadRole('soldier', manifest); }
-  catch (err) { console.warn('[aegis] soldier load failed', err); }
-  let loadedDrone = null;
-  try {
-    loadedDrone = await loadRole('drone', manifest);
-    if (!loadedDrone?.entry?.url) loadedDrone = null;
-  } catch (err) { console.warn('[aegis] drone load failed', err); }
-
   const enemies = [];
   const getEnemies = () => enemies;
 
@@ -104,7 +95,12 @@ async function boot() {
 
   const orbit = new ThirdPersonCamera(camera, tuning);
 
-  const levelCtx = { scene, physics, strings, enemiesData, powers, puzzle, tuning, loadedSoldier, bus };
+  const encounters = createEncounters({
+    bus, scene, physics, player, enemies, manifest,
+    data: { enemies: enemiesData, strings },
+  });
+
+  const levelCtx = { scene, physics, strings, enemiesData, powers, puzzle, tuning, bus };
   const factories = {
     rooftop: createRooftop,
     cradle: createCradle,
@@ -112,21 +108,15 @@ async function boot() {
     arena: createArena,
   };
   let current = null;
-  let gotoToken = 0;
 
-  async function goto(name) {
+  function goto(name) {
     if (!factories[name]) { console.warn('unknown level', name); return; }
-    const token = ++gotoToken;
     if (current) {
-      current.ai?.dispose();
-      current.ai = null;
-      enemies.length = 0;
       current.unload();
       current = null;
     }
     const level = factories[name](levelCtx);
     current = level;
-    if (current.enemies) enemies.push(...current.enemies);
     if (level.fog) {
       scene.fog = new THREE.Fog(level.fog.color, level.fog.near, level.fog.far);
       renderer.setClearColor(level.clearColor ?? level.fog.color, 1);
@@ -135,20 +125,6 @@ async function boot() {
     pawn.face(level.faceYaw ?? 0, true);
     orbit.setLook(level.faceYaw ?? 0, 0.28);
     bus.emit('levelState', { level: name, phase: 'enter' });
-    if (level.navMeshes?.length && level.spawns?.length) {
-      try {
-        const ai = await bootLevelAI(level, {
-          bus, player, enemiesData, strings, loadedSoldier, loadedDrone,
-        });
-        if (token !== gotoToken) { ai?.dispose(); return; }
-        if (ai) {
-          enemies.length = 0;
-          enemies.push(...ai.enemies);
-        }
-      } catch (err) {
-        console.warn('[aegis] AI boot failed', err);
-      }
-    }
   }
 
   // game.player contract + debug hooks
@@ -163,7 +139,8 @@ async function boot() {
     clock,
     input,
     get level() { return current?.name; },
-    get ai() { return current?.ai || null; },
+    get ai() { return encounters.ai; },
+    encounters,
     goto,
     tuning,
     strings,
@@ -181,7 +158,8 @@ async function boot() {
     get bus() { return bus; },
     get game() { return game; },
     get clock() { return clock; },
-    get ai() { return current?.ai || null; },
+    get ai() { return encounters.ai; },
+    get encounters() { return encounters; },
     Events,
     state() {
       return {
@@ -249,9 +227,8 @@ async function boot() {
 
     pawn.update(dt, orbit.yaw);
     orbit.update(dt, player.position, physics);
-    current?.ai?.update(dt);
-    tickEnemyViews(current?.ai, dt);
     current?.update?.(dt, player.position, bus);
+    encounters.update(dt);
     fx.update(dt);
 
     if (portalLock > 0) portalLock -= dt;

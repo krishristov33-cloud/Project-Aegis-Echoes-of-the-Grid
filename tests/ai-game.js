@@ -21,24 +21,29 @@ const TEST_ENCOUNTERS = {
 
 while (!window.AG?.ready) await new Promise((r) => setTimeout(r, 100));
 const game = window.game;
-const enemiesData = await fetch('src/data/enemies.json').then((r) => r.json());
-const data = { enemies: { ...enemiesData, encounters: enemiesData.encounters ?? TEST_ENCOUNTERS }, strings: game.strings };
-const encounters = createEncounters({
-  bus: game.bus,
-  scene: game.scene,
-  physics: game.physics,
-  player: game.player,
-  enemies: game.enemies,
-  manifest: game.manifest,
-  data,
-});
-let last = performance.now();
-(function loop() {
-  requestAnimationFrame(loop);
-  const now = performance.now();
-  encounters.update(Math.min((now - last) / 1000, game.time?.maxDt ?? 0.1));
-  last = now;
-})();
+// main.js now wires createEncounters; do not attach a second director.
+if (game.encounters) {
+  window.__enc = game.encounters;
+} else {
+  const enemiesData = await fetch('src/data/enemies.json').then((r) => r.json());
+  const data = { enemies: { ...enemiesData, encounters: enemiesData.encounters ?? TEST_ENCOUNTERS }, strings: game.strings };
+  const encounters = createEncounters({
+    bus: game.bus,
+    scene: game.scene,
+    physics: game.physics,
+    player: game.player,
+    enemies: game.enemies,
+    manifest: game.manifest,
+    data,
+  });
+  let last = performance.now();
+  (function loop() {
+    requestAnimationFrame(loop);
+    const now = performance.now();
+    encounters.update(Math.min((now - last) / 1000, game.time?.maxDt ?? 0.1));
+    last = now;
+  })();
+  game.goto(game.level ?? 'rooftop'); // re-enter so encounters sees levelState
+  window.__enc = encounters;
+}
 game.bus.on('callout', ({ speaker, text }) => console.log(`[callout] ${speaker}: ${text}`));
-game.goto(game.level ?? 'rooftop'); // re-enter so encounters sees levelState
-window.__enc = encounters;
