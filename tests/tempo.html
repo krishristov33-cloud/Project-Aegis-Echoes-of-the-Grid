@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:," />
+<title>Aegis Tempo Sync test (C5)</title>
+<style>
+  :root { --bg: #05070c; --cyan: #3df0ff; --mag: #ff3d8a; --txt: #d6f7ff; --dim: #7aa0ae; --panel: rgba(6, 10, 18, 0.85); }
+  html, body { margin: 0; background: var(--bg); color: var(--txt); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font: 900 22px system-ui; letter-spacing: 0.08em; margin: 0 0 4px; }
+  .sub { color: var(--dim); margin-bottom: 18px; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+  .panel { background: var(--panel); border-left: 3px solid var(--cyan); padding: 12px 14px; }
+  button, select, input[type=number] { font: 700 13px system-ui; background: #0e1726; color: var(--txt); border: 1px solid #23324a; padding: 7px 12px; cursor: pointer; }
+  button.primary { background: var(--cyan); color: #041018; border: 0; }
+  canvas { background: #0a1220; border-radius: 50%; }
+  #big { font: 900 44px ui-monospace, Consolas, monospace; }
+  #onbeat { font: 900 14px system-ui; letter-spacing: 0.2em; padding: 4px 10px; background: #1a2232; }
+  #onbeat.on { background: var(--mag); color: #fff; }
+  .stem { display: grid; grid-template-columns: 60px 1fr 40px; gap: 8px; align-items: center; font: 12px ui-monospace, Consolas, monospace; }
+  .bar { height: 8px; background: #1a2232; }
+  .bar > div { height: 100%; background: var(--cyan); width: 0; }
+  #log { font: 12px/1.5 ui-monospace, Consolas, monospace; color: var(--dim); white-space: pre-wrap; max-height: 220px; overflow: auto; }
+  label { color: var(--dim); }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js" } }
+</script>
+</head>
+<body>
+<main>
+  <h1>TEMPO SYNC</h1>
+  <div class="sub">C5 test page: the real <code>audio-clock.js</code> + <code>music.js</code> + <code>bpm.js</code> on the real bus. Drop an audio file anywhere on this page to sync to it.</div>
+  <div class="row">
+    <button class="primary" id="start">Start audio</button>
+    <span id="timebase" class="panel">timebase: frame</span>
+  </div>
+  <div class="row">
+    <canvas id="ring" width="160" height="160"></canvas>
+    <div>
+      <div id="big">174.00</div>
+      <div><span id="beat">beat 0 · bar 0</span> &nbsp; <span id="onbeat">ON BEAT</span></div>
+      <div class="row">
+        <label>BPM <input type="number" id="bpmIn" value="174" min="60" max="220" step="0.5" style="width:80px" /></label>
+        <button id="setBpm">Set</button>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="row"><label>Intensity</label><input type="range" id="int" min="0" max="1" step="0.01" value="0" style="flex:1" /><button id="auto">auto</button></div>
+    <div id="stems"></div>
+  </div>
+  <div class="row">
+    <label>Test track</label>
+    <select id="genBpm"><option>174</option><option>172</option><option>128</option><option selected>165.5</option><option>140</option></select>
+    <button id="gen">Render + load</button>
+    <label class="panel" style="cursor:pointer">Load file… <input type="file" id="file" accept="audio/*" hidden /></label>
+    <button id="stemsBtn">Back to stems</button>
+  </div>
+  <div id="log" class="panel"></div>
+</main>
+<script type="module" src="./tempo.js"></script>
+</body>
+</html>
