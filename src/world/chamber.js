@@ -2,8 +2,9 @@
 import * as THREE from 'three';
 import { addBox, makeMat } from './greybox.js';
 
-/** C4: implement acoustic puzzle logic against Krea's src/data/puzzle.json. */
-export function updatePuzzle(/* ctx, dt */) { /* no-op until C4 */ }
+/** C4: acoustic puzzle logic against Krea's src/data/puzzle.json lives in acoustic-puzzle.js. */
+export { updatePuzzle } from './acoustic-puzzle.js';
+import { updatePuzzle } from './acoustic-puzzle.js';
 
 export function createChamber(ctx) {
   const { scene, physics } = ctx;
