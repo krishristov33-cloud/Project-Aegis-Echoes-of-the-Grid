@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { loadRole } from '../core/assets.js';
 import { createAI } from './director.js';
+import { createHulk } from './hulk.js';
 
 const V = (a) => new THREE.Vector3(a[0], a[1] ?? 0, a[2]);
 
@@ -84,7 +85,7 @@ export function createEncounters({ bus, scene, physics, player, enemies, manifes
     const my = ++token;
     teardown();
     const spec = data.enemies.encounters?.[level];
-    if (!spec?.squads?.length) return;
+    if (!spec?.squads?.length && !spec?.boss) return;
     let next;
     try {
       next = await createAI({ bus, player, physics, data });
@@ -94,7 +95,7 @@ export function createEncounters({ bus, scene, physics, player, enemies, manifes
     }
     if (my !== token) return next.dispose(); // level changed while the navmesh was building
     ai = next;
-    for (const sq of spec.squads) {
+    for (const sq of spec.squads ?? []) {
       const squad = ai.createSquad(sq.name ?? level);
       for (const s of sq.soldiers ?? []) {
         const v = await makeView('soldier', manifest);
@@ -112,6 +113,21 @@ export function createEncounters({ bus, scene, physics, player, enemies, manifes
         views.push({ enemy: e, ...v });
         enemies.push(e);
       }
+    }
+    // boss: { type: 'hulk', pos, yaw, role? } — gets the level's destructible floor tiles (userData.destructible)
+    if (spec.boss?.type === 'hulk') {
+      const v = await makeView(spec.boss.role ?? 'hulk', manifest);
+      if (my !== token) return;
+      scene.add(v.holder);
+      const tiles = [];
+      scene.traverse((o) => o.isMesh && o.userData?.destructible && tiles.push(o));
+      const h = createHulk({
+        bus, physics, scene, view: v.holder, position: V(spec.boss.pos), yaw: spec.boss.yaw ?? 0,
+        cfg: data.enemies.hulk, clock: globalThis.game?.clock, tiles,
+      });
+      ai.register(h);
+      views.push({ enemy: h, ...v });
+      enemies.push(h);
     }
   }
 
