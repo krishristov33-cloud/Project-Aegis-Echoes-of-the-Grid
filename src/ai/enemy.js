@@ -65,6 +65,11 @@ export class Enemy {
   takeDamage(n, src) {
     if (this.dead || !(n > 0)) return;
     this.hp = Math.max(0, this.hp - n);
+    // sidechain combat (C6): every hit Kael lands ducks the enemy for a punish window, longer on the beat
+    if (this.hp > 0 && (src?.source === 'player' || src === 'player')) {
+      const punish = this.cfg.punishWindow ?? 0.35;
+      this.duck(punish * (src?.onBeat ? 1.5 : 1));
+    }
     this.bus.emit('enemyHit', { id: this.id, kind: this.kind, amount: n, hp: this.hp, hpMax: this.hpMax, pos: this.position.clone(), src });
     if (this.hp <= 0) {
       this.dead = true;
