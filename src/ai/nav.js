@@ -1,29 +1,34 @@
 // Navigation: recast/detour navmesh + crowd, wrapped so the rest of the AI never touches recast directly.
-// Build once per level from the level's walkable + obstacle meshes:
-//   const nav = await createNav(levelMeshes, { agentRadius: 0.4 });
-// Requires import-map entries for `recast-navigation` and `@recast-navigation/*` (see tests/ai.html).
+//   const nav = await createNav({ positions, indices }, { agentRadius: 0.4 });
+// Geometry comes from level-geometry.js (built from the physics world), so any level works.
+//
+// recast-navigation is loaded from jsDelivr's `+esm` bundles (exact version) so index.html's import map
+// needs no change. If Lumen would rather map it, swap these two URLs for bare specifiers.
 import * as THREE from 'three';
-import { init, NavMeshQuery, Crowd } from 'recast-navigation';
-import { threeToSoloNavMesh, NavMeshHelper } from '@recast-navigation/three';
+import { init, NavMeshQuery, Crowd, getNavMeshPositionsAndIndices } from 'https://cdn.jsdelivr.net/npm/@recast-navigation/core@0.43.1/+esm';
+import { generateSoloNavMesh } from 'https://cdn.jsdelivr.net/npm/@recast-navigation/generators@0.43.1/+esm';
 
 let initPromise = null;
 const ensureInit = () => (initPromise ??= init());
 
 const toV3 = (p) => new THREE.Vector3(p.x, p.y, p.z);
 
-export async function createNav(meshes, opts = {}) {
+/**
+ * @param {{positions: ArrayLike<number>, indices: ArrayLike<number>}} geo  world-space triangle soup
+ * @param {object} opts  agentRadius, agentHeight, maxClimb, maxSlope, cellSize, cellHeight, maxAgents
+ */
+export async function createNav(geo, opts = {}) {
   await ensureInit();
   const agentRadius = opts.agentRadius ?? 0.4;
-  const cs = opts.cellSize ?? 0.2;
-  const ch = opts.cellHeight ?? 0.2;
-  meshes.forEach((m) => m.updateMatrixWorld(true));
-  const { success, navMesh } = threeToSoloNavMesh(meshes, {
+  const cs = opts.cellSize ?? 0.15;
+  const ch = opts.cellHeight ?? 0.1;
+  const { success, navMesh } = generateSoloNavMesh(geo.positions, geo.indices, {
     cs,
     ch,
     walkableRadius: Math.ceil(agentRadius / cs),
     walkableHeight: Math.ceil((opts.agentHeight ?? 1.8) / ch),
-    walkableClimb: Math.ceil((opts.maxClimb ?? 0.4) / ch),
-    walkableSlopeAngle: opts.maxSlope ?? 45,
+    walkableClimb: Math.ceil((opts.maxClimb ?? 0.35) / ch),
+    walkableSlopeAngle: opts.maxSlope ?? 40,
     ...opts.recast,
   });
   if (!success) throw new Error('nav: navmesh generation failed');
@@ -47,16 +52,6 @@ export async function createNav(meshes, opts = {}) {
     path(from, to) {
       const r = query.computePath(from, to, { halfExtents });
       return r.success ? r.path.map(toV3) : [];
-    },
-
-    /** Path length along the navmesh (Infinity if unreachable). Use sparingly: one computePath per call. */
-    pathLength(from, to) {
-      const pts = this.path(from, to);
-      if (!pts.length) return Infinity;
-      let d = 0;
-      for (let i = 1; i < pts.length; i++) d += pts[i].distanceTo(pts[i - 1]);
-      // computePath ends at the nearest reachable point; treat a big gap as unreachable
-      return pts[pts.length - 1].distanceTo(to) > 1.0 ? Infinity : d;
     },
 
     randomPointAround(center, radius) {
@@ -85,12 +80,16 @@ export async function createNav(meshes, opts = {}) {
       crowd.update(Math.min(dt, 0.1));
     },
 
+    /** Translucent mesh of the navmesh for debug views. */
     debugObject() {
-      const helper = new NavMeshHelper(navMesh, {
-        navMeshMaterial: new THREE.MeshBasicMaterial({ color: 0x2bd4a8, transparent: true, opacity: 0.25, depthWrite: false }),
-      });
-      helper.position.y += 0.03;
-      return helper;
+      const [positions, indices] = getNavMeshPositionsAndIndices(navMesh);
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      g.setIndex(indices);
+      const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x2bd4a8, transparent: true, opacity: 0.25, depthWrite: false }));
+      m.position.y = 0.03;
+      m.renderOrder = 2;
+      return m;
     },
 
     dispose() {

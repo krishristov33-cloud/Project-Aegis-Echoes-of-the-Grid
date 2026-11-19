@@ -23,12 +23,15 @@ export class CoverSystem {
     this.points = []; // { id, pos, normal, height: 'low'|'high', claimedBy }
   }
 
-  /** Generate points around these meshes (crates, walls, AC units...). Call once per level. */
-  generate(meshes) {
+  /** Generate points around these obstacles (THREE.Box3 or Object3D: crates, walls, AC units...). Call once per level. */
+  generate(items) {
     const { spacing, offset, lowHeight, highHeight, snapMax } = this.cfg;
-    for (const mesh of meshes) {
-      mesh.updateMatrixWorld(true);
-      _box.setFromObject(mesh);
+    for (const item of items) {
+      if (item.isBox3) _box.copy(item);
+      else {
+        item.updateMatrixWorld(true);
+        _box.setFromObject(item);
+      }
       const h = _box.max.y - _box.min.y;
       if (h < lowHeight * 0.8) continue; // too short to hide behind
       const height = h >= highHeight ? 'high' : 'low';

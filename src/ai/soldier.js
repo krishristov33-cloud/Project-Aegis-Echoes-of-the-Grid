@@ -87,10 +87,31 @@ export class Soldier extends Enemy {
   // ---------- main tick ----------
   update(dt, now, player) {
     this.now = now;
-    if (this.dead) return;
+    this.target = player;
+    if (this.dead) {
+      this._deathFall(dt);
+      return;
+    }
+
+    // knockback: slide along the navmesh, then let the crowd take over again
+    if (this.knockback.lengthSq() > 0.05) {
+      const next = this.position.clone().addScaledVector(this.knockback, dt).setY(this.position.y);
+      const snapped = this.nav.closest(next, { x: 1, y: 2, z: 1 });
+      if (snapped) this.agent.teleport(snapped);
+      this.moveTarget = null;
+      this.knockback.multiplyScalar(Math.max(0, 1 - 6 * dt));
+    }
 
     const ap = this.agent.position();
     this.position.set(ap.x, ap.y, ap.z);
+    // the navmesh surface is only approximate (cell height); stand the feet on the real ground
+    this._groundT = (this._groundT ?? 0) - dt;
+    if (this._groundT <= 0 && this.los.groundAt) {
+      this._groundT = 0.15;
+      const gy = this.los.groundAt(this.position);
+      this._groundOffset = gy === null ? 0 : gy - ap.y;
+    }
+    this.position.y += this._groundOffset ?? 0;
     const v = this.agent.velocity();
     this.velocity.set(v.x, v.y, v.z);
 
@@ -352,7 +373,7 @@ export class Soldier extends Enemy {
   onHurt(n, src) {
     this.hitTimer = 0.25;
     this.suppression = Math.min(1, this.suppression + 0.35);
-    const pos = src?.position;
+    const pos = this.sourcePosition(src);
     if (pos) {
       this.perception.share(pos, this.now, true);
       this.squad?.report(this, pos, true);
@@ -365,6 +386,12 @@ export class Soldier extends Enemy {
 
   onDucked() {
     if (Math.random() < 0.5) this.squad?.say(this, 'ducked');
+  }
+
+  _deathFall(dt) {
+    if (!this.view || this._fallen) return;
+    this.view.rotation.x = Math.max(this.view.rotation.x - dt * 3, -Math.PI / 2);
+    if (this.view.rotation.x <= -Math.PI / 2 + 1e-3) this._fallen = true;
   }
 
   onDeath() {

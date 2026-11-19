@@ -4,6 +4,7 @@ import { createStage, box } from './harness/stage.js';
 import { createBus } from './harness/bus.js';
 import { PlayerStub } from './harness/player-stub.js';
 import { createAI } from '../src/ai/director.js';
+import { PhysicsWorld } from '../src/core/physics.js';
 
 const [enemies, strings] = await Promise.all(['../src/data/enemies.json', '../src/data/strings.json'].map((u) => fetch(u).then((r) => r.json())));
 
@@ -14,7 +15,14 @@ const bus = createBus();
 // ---------- level greybox ----------
 const floor = box(scene, { w: 64, h: 0.4, d: 64, x: 0, y: -0.4, z: 0, color: 0x1c222c });
 const occluders = [];
-const L = (o) => occluders.push(box(scene, o));
+const physics = new PhysicsWorld();
+const reg = (m, userData) => physics.addBox({ center: m.position.clone(), halfExtents: new THREE.Vector3(m.geometry.parameters.width / 2, m.geometry.parameters.height / 2, m.geometry.parameters.depth / 2), userData });
+reg(floor, { solid: true, ground: true });
+const L = (o) => {
+  const m = box(scene, o);
+  reg(m, { solid: true, ground: o.h < 1.3 });
+  occluders.push(m);
+};
 // high walls / vents
 L({ w: 8, h: 2.6, d: 0.6, x: -10, z: -4 });
 L({ w: 0.6, h: 2.6, d: 7, x: 9, z: -9 });
@@ -32,7 +40,7 @@ L({ w: 1.4, h: 1.2, d: 4, x: 22, z: -4, color: 0x52606e });
 const status = document.getElementById('status');
 let ai;
 try {
-  ai = await createAI({ bus, player: null, level: { navMeshes: [floor, ...occluders], occluders, coverMeshes: occluders }, data: { enemies, strings } });
+  ai = await createAI({ bus, physics, data: { enemies, strings } });
 } catch (err) {
   status.textContent = `AI init failed: ${err.message}`;
   throw err;
