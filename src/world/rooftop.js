@@ -1,187 +1,130 @@
-// Sofia rooftop escape — rainy neon cyberpunk art pass. Mood from Krea's 00_master:
-// wet low-roughness deck, cyan/magenta trim, amuNet tower, far instanced skyline.
+// Sofia rooftop escape: rainy neon night. Wet reflective deck with puddles, neon signage, searchlights,
+// a layered skyline in haze, and rim light so characters read against the dark.
+// Colliders are unchanged from the greybox (sprint / vault lane, uneven IK patch, ramp, lower roof).
 import * as THREE from 'three';
-import { addBox, makeMat, wetRoofMaps, neonSign } from './greybox.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { addBox, makeMat } from './greybox.js';
 import { createRain } from './rain.js';
+import { mulberry32, placeProp, makeEnv, skyDome, deckMaps, wetDeck, lightCone, glowSprite, neonText, portalGate } from './kit.js';
 
-function mulberry32(a) {
-  return () => {
-    let t = (a += 0x6D2B79F5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+function trim(list, pos, size) {
+  const g = new THREE.BoxGeometry(size[0], size[1], size[2]);
+  g.translate(pos[0], pos[1], pos[2]);
+  list.push(g);
 }
 
-function makeNightEnv(renderer) {
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const s = new THREE.Scene();
-  s.add(new THREE.HemisphereLight(0x7ec8e8, 0x1a1020, 1.15));
-  s.add(new THREE.Mesh(
-    new THREE.SphereGeometry(30, 16, 12),
-    new THREE.MeshBasicMaterial({ color: 0x152838, side: THREE.BackSide }),
-  ));
-  const cyan = new THREE.Mesh(new THREE.BoxGeometry(8, 8, 1), new THREE.MeshBasicMaterial({ color: 0x3df0ff }));
-  cyan.position.set(-10, 6, -20); s.add(cyan);
-  const mag = new THREE.Mesh(new THREE.BoxGeometry(8, 8, 1), new THREE.MeshBasicMaterial({ color: 0xff3d8a }));
-  mag.position.set(10, 5, -20); s.add(mag);
-  const warm = new THREE.Mesh(new THREE.BoxGeometry(22, 4, 1), new THREE.MeshBasicMaterial({ color: 0xffc070 }));
-  warm.position.set(0, -4, -15); s.add(warm);
-  const rt = pmrem.fromScene(s, 0.04);
-  pmrem.dispose();
-  return rt;
-}
-
-function trim(group, pos, size, color, intensity = 1.7) {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(size[0], size[1], size[2]),
-    makeMat({ color, roughness: 0.22, metalness: 0.35, emissive: color, emissiveIntensity: intensity }),
-  );
-  mesh.position.set(pos[0], pos[1], pos[2]);
-  mesh.castShadow = false;
-  mesh.receiveShadow = false;
+function trimMesh(group, list, color, gain = 2.2) {
+  if (!list.length) return null;
+  const mesh = new THREE.Mesh(mergeGeometries(list), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(gain) }));
+  list.forEach((g) => g.dispose());
+  mesh.castShadow = false; mesh.receiveShadow = false;
   group.add(mesh);
   return mesh;
 }
 
-function placeProp(group, physics, ids, props, name, x, z, yaw = 0, collide = false, scale = 1, yAdd = 0) {
-  const loaded = props?.[name];
-  if (!loaded?.root) return null;
-  const obj = loaded.root.clone(true);
-  obj.position.x = x;
-  obj.position.z = z;
-  obj.position.y = loaded.root.position.y * scale + yAdd;
-  if (scale !== 1) obj.scale.multiplyScalar(scale);
-  if (yaw) obj.rotation.y = yaw;
-  obj.traverse((m) => { if (m.isMesh) { m.castShadow = false; m.receiveShadow = true; } });
-  group.add(obj);
-  if (collide && physics) {
-    obj.updateWorldMatrix(true, true);
-    const box = new THREE.Box3().setFromObject(obj);
-    if (!box.isEmpty()) {
-      const size = new THREE.Vector3();
-      const center = new THREE.Vector3();
-      box.getSize(size);
-      box.getCenter(center);
-      // keep colliders tight so dressing can't eat the sprint/vault lane
-      size.x = Math.min(size.x, 2.4) * 0.85;
-      size.z = Math.min(size.z, 2.4) * 0.85;
-      size.y *= 0.9;
-      const id = physics.addBox({
-        center,
-        halfExtents: size.multiplyScalar(0.5),
-        userData: { solid: true },
-      });
-      if (id) ids.push(id);
-    }
-  }
-  return obj;
-}
-
-function addSkyline(group) {
+/** Two rings of towers merged into one mesh each, with instanced lit windows facing the roof. */
+function addSkyline(group, beacons) {
   const rand = mulberry32(0xAE615);
-  const bodyMat = makeMat({ color: 0x101820, roughness: 0.82, metalness: 0.12 });
-  const glassMat = makeMat({ color: 0x152030, roughness: 0.12, metalness: 0.7, emissive: 0x0a2030, emissiveIntensity: 0.2 });
-  // x, z, w, h, d, yaw, glass?
-  const blocks = [
-    [-8, -36, 9, 22, 8, 0, false],
-    [8, -34, 11, 26, 9, 0, false],
-    [24, -26, 10, 18, 8, 0.12, false],
-    [32, -12, 8, 20, 8, 0.4, false],
-    [30, 8, 9, 16, 7, 0.55, false],
-    [-32, -10, 10, 24, 8, -0.3, false],
-    [-30, 10, 8, 14, 7, -0.5, false],
-    [18, -42, 14, 20, 10, 0, false],
-    [-16, -44, 10, 16, 8, 0, false],
-    [0, -50, 16, 12, 8, 0, false],
-    [42, -30, 8, 28, 8, 0.05, false],
-    [-42, -26, 9, 22, 8, -0.08, false],
-    [20, -22, 7, 14, 7, 0.15, false],
-    [-24, -32, 8, 18, 7, -0.1, false],
-    [36, 2, 7, 12, 6, 0.7, false],
-    [-36, 0, 7, 15, 6, -0.6, false],
-    [16, 38, 10, 20, 8, Math.PI, false],
-    [-14, 42, 9, 24, 8, Math.PI, false],
-    [28, 30, 8, 16, 7, 2.8, false],
-    [-28, 32, 9, 18, 8, -2.8, false],
-    [4, 52, 14, 18, 9, Math.PI, false],
-    [22, 48, 8, 14, 7, 3.0, false],
-    [-22, 50, 8, 16, 7, -3.0, false],
+  // x, z, w, h, d
+  const near = [
+    [-8, -36, 9, 22, 8], [8, -34, 11, 26, 9], [24, -26, 10, 18, 8], [32, -12, 8, 20, 8], [30, 8, 9, 16, 7],
+    [-32, -10, 10, 24, 8], [-30, 10, 8, 14, 7], [18, -42, 14, 20, 10], [-16, -44, 10, 16, 8], [0, -50, 16, 12, 8],
+    [42, -30, 8, 28, 8], [-42, -26, 9, 22, 8], [20, -22, 7, 14, 7], [-24, -32, 8, 18, 7], [36, 2, 7, 12, 6],
+    [-36, 0, 7, 15, 6], [16, 40, 10, 20, 8], [-14, 44, 9, 24, 8], [30, 30, 8, 16, 7], [-30, 32, 9, 18, 8],
+    [4, 54, 14, 18, 9], [22, 50, 8, 14, 7], [-22, 52, 8, 16, 7],
   ];
-  const winGeom = new THREE.BoxGeometry(0.55, 0.7, 0.1);
-  const warmMat = makeMat({ color: 0x1a1208, emissive: 0xffc070, emissiveIntensity: 1.15, roughness: 0.85 });
-  const coolMat = makeMat({ color: 0x081018, emissive: 0x5ad8ff, emissiveIntensity: 0.95, roughness: 0.7 });
-  const warm = new THREE.InstancedMesh(winGeom, warmMat, 900);
-  const cool = new THREE.InstancedMesh(winGeom, coolMat, 280);
-  warm.castShadow = cool.castShadow = false;
-  warm.receiveShadow = cool.receiveShadow = false;
-  warm.frustumCulled = cool.frustumCulled = false;
-  const dummy = new THREE.Object3D();
-  let wi = 0, ci = 0;
-  for (const [x, z, w, h, d, yaw, glass] of blocks) {
-    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), glass ? glassMat : bodyMat);
-    body.position.set(x, h / 2, z);
-    body.rotation.y = yaw;
-    body.castShadow = false;
-    body.receiveShadow = false;
-    group.add(body);
-    // windows on the facade facing the rooftop (roughly +Z / toward origin)
-    const cols = Math.max(3, Math.floor(w / 1.7));
-    const rows = Math.max(4, Math.floor(h / 2.15));
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const roll = rand();
-        if (roll < 0.28) continue;
-        const lx = -w / 2 + 1.0 + c * ((w - 2) / Math.max(1, cols - 1));
-        const ly = 1.5 + r * ((h - 2.4) / Math.max(1, rows - 1));
-        const lz = d / 2 + 0.06;
-        dummy.position.set(lx, ly, lz);
-        dummy.rotation.set(0, 0, 0);
-        dummy.updateMatrix();
-        // rotate around building origin
-        const m = dummy.matrix.clone();
-        const pose = new THREE.Matrix4().makeRotationY(yaw);
-        pose.setPosition(x, 0, z);
-        const world = new THREE.Matrix4().multiplyMatrices(pose, m);
-        if (roll > 0.86 && ci < 280) cool.setMatrixAt(ci++, world);
-        else if (wi < 900) warm.setMatrixAt(wi++, world);
-      }
-    }
+  const far = [];
+  for (let i = 0; i < 46; i++) {
+    const a = (i / 46) * Math.PI * 2 + rand() * 0.1;
+    const r = 78 + rand() * 46;
+    far.push([Math.sin(a) * r, Math.cos(a) * r, 8 + rand() * 12, 18 + rand() * 46, 8 + rand() * 10]);
   }
-  warm.count = wi;
-  cool.count = ci;
-  warm.instanceMatrix.needsUpdate = true;
-  cool.instanceMatrix.needsUpdate = true;
-  group.add(warm);
-  group.add(cool);
+  const winGeom = new THREE.PlaneGeometry(0.6, 0.8);
+  const warm = new THREE.InstancedMesh(winGeom, new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc070).multiplyScalar(1.5) }), 2600);
+  const cool = new THREE.InstancedMesh(winGeom, new THREE.MeshBasicMaterial({ color: new THREE.Color(0x5ad8ff).multiplyScalar(1.4) }), 900);
+  const dummy = new THREE.Object3D();
+  const UP = new THREE.Vector3(0, 1, 0);
+  let wi = 0, ci = 0;
+  const build = (blocks, mat, windowScale, density) => {
+    const geoms = [];
+    for (const [x, z, w, h, d] of blocks) {
+      const yaw = Math.atan2(-x, -z); // face the roof
+      const g = new THREE.BoxGeometry(w, h, d);
+      g.rotateY(yaw);
+      g.translate(x, h / 2 - 14, z);
+      geoms.push(g);
+      const cols = Math.max(3, Math.floor(w / 1.7));
+      const rows = Math.max(4, Math.floor(h / 2.3));
+      const litFloor = rand();
+      for (let r = 0; r < rows; r++) {
+        const rowLit = rand() < 0.2 ? 0.9 : density;
+        for (let c = 0; c < cols; c++) {
+          const roll = rand();
+          if (roll > rowLit) continue;
+          const lx = -w / 2 + 1.0 + c * ((w - 2) / Math.max(1, cols - 1));
+          const ly = 1.5 + r * ((h - 2.6) / Math.max(1, rows - 1)) - 14;
+          dummy.position.set(lx, ly, d / 2 + 0.08).applyAxisAngle(UP, yaw);
+          dummy.position.x += x; dummy.position.z += z;
+          dummy.rotation.set(0, yaw, 0);
+          dummy.scale.setScalar(windowScale);
+          dummy.updateMatrix();
+          if ((roll * 7.3 + litFloor) % 1 > 0.8 && ci < 900) cool.setMatrixAt(ci++, dummy.matrix);
+          else if (wi < 2600) warm.setMatrixAt(wi++, dummy.matrix);
+        }
+      }
+      if (h > 20 && beacons.length < 14 && rand() > 0.35) beacons.push(new THREE.Vector3(x, h - 14 + 0.8, z));
+    }
+    const mesh = new THREE.Mesh(mergeGeometries(geoms), mat);
+    geoms.forEach((g) => g.dispose());
+    mesh.castShadow = false; mesh.receiveShadow = false;
+    group.add(mesh);
+  };
+  build(near, makeMat({ color: 0x0c131b, roughness: 0.55, metalness: 0.35 }), 1, 0.5);
+  build(far, makeMat({ color: 0x0a1118, roughness: 0.9, metalness: 0.05 }), 1.5, 0.34);
+  warm.count = wi; cool.count = ci;
+  for (const m of [warm, cool]) {
+    m.instanceMatrix.needsUpdate = true;
+    m.castShadow = false; m.receiveShadow = false; m.frustumCulled = false;
+    group.add(m);
+  }
 }
 
 export function createRooftop(ctx) {
-  const { scene, physics, strings, props, renderer } = ctx;
+  const { scene, physics, strings, props, renderer, tuning } = ctx;
   const group = new THREE.Group(); group.name = 'rooftop';
   const ids = [];
   const mats = {
-    concrete: makeMat({ color: 0x2a3444, roughness: 0.22, metalness: 0.18 }),
-    wet: (() => {
-      const m = makeMat({ color: 0xc8d4e0, roughness: 0.14, metalness: 0.36 });
-      const maps = wetRoofMaps();
-      m.map = maps.map;
-      m.roughnessMap = maps.roughnessMap;
-      return m;
-    })(),
-    metal: makeMat({ color: 0x3a4554, roughness: 0.32, metalness: 0.7 }),
-    rust: makeMat({ color: 0x4a3c36, roughness: 0.48, metalness: 0.3 }),
-    parapet: makeMat({ color: 0x1c2530, roughness: 0.28, metalness: 0.2, emissive: 0x0a1520, emissiveIntensity: 0.15 }),
-    glass: makeMat({ color: 0x1a2838, roughness: 0.08, metalness: 0.85, emissive: 0x0a2030, emissiveIntensity: 0.35 }),
+    concrete: makeMat({ color: 0x252d38, roughness: 0.42, metalness: 0.1 }),
+    deck: makeMat({ color: 0x10151b, roughness: 0.5, metalness: 0.1 }),
+    metal: makeMat({ color: 0x343e4b, roughness: 0.34, metalness: 0.75 }),
+    rust: makeMat({ color: 0x3e3430, roughness: 0.5, metalness: 0.35 }),
+    parapet: makeMat({ color: 0x1a222c, roughness: 0.36, metalness: 0.25 }),
+    glass: makeMat({ color: 0x0e1a26, roughness: 0.06, metalness: 0.9, emissive: 0x0a2030, emissiveIntensity: 0.3 }),
   };
+  for (const m of [mats.concrete, mats.metal, mats.rust, mats.parapet]) m.envMapIntensity = 1.3;
   const box = (opts) => {
     const r = addBox({ group, physics, mats }, opts);
     if (r.id) ids.push(r.id);
     return r;
   };
 
-  // Main roof deck (top at y=0)
-  box({ id: 'roof', size: [28, 0.7, 22], pos: [0, -0.35, 0], mat: mats.wet, userData: { solid: true, ground: true }, cast: false });
+  // ---------- decks (collider boxes + wet reflective tops) ----------
+  box({ id: 'roof', size: [28, 0.7, 22], pos: [0, -0.35, 0], mat: mats.deck, userData: { solid: true, ground: true }, cast: false });
+  box({ id: 'roof-low', size: [14, 0.6, 10], pos: [0, -2.8, 17], mat: mats.deck, userData: { solid: true, ground: true }, cast: false });
+  const decks = [
+    wetDeck(group, {
+      w: 28, d: 22, x: 0, z: 0, y: 0,
+      maps: deckMaps({ w: 28, d: 22, seed: 0xA3E15, panel: 2, puddles: 30 }),
+      envMapIntensity: 1.2, normalScale: 0.14, normalRepeat: 0.7,
+      reflect: { strength: 0.9, base: 0.18, blur: 0.006, ripple: 0.0011 },
+    }),
+    wetDeck(group, {
+      w: 14, d: 10, x: 0, z: 17, y: -2.5,
+      maps: deckMaps({ w: 14, d: 10, seed: 0x51DE, panel: 2, puddles: 12, res: 512 }),
+      envMapIntensity: 1.2, normalScale: 0.14, normalRepeat: 0.7,
+      reflect: { strength: 0.9, base: 0.18, blur: 0.006, ripple: 0.0011 },
+    }),
+  ];
 
   // Parapets with a gap on +Z toward the lower roof / vault lane
   const ph = 0.55, pt = 0.28;
@@ -191,157 +134,209 @@ export function createRooftop(ctx) {
   box({ size: [pt, ph, 22], pos: [-14 + pt / 2, ph / 2, 0], mat: mats.parapet, userData: { solid: true } });
   box({ size: [pt, ph, 22], pos: [14 - pt / 2, ph / 2, 0], mat: mats.parapet, userData: { solid: true } });
 
-  // Cyan / magenta emissive trim on parapet tops and the deck edge
-  trim(group, [0, ph + 0.03, -11 + pt / 2], [28, 0.05, 0.08], 0x3df0ff);
-  trim(group, [-8, ph + 0.03, 11 - pt / 2], [12, 0.05, 0.08], 0xff3d8a);
-  trim(group, [8, ph + 0.03, 11 - pt / 2], [12, 0.05, 0.08], 0xff3d8a);
-  trim(group, [-14 + pt / 2, ph + 0.03, 0], [0.08, 0.05, 22], 0x3df0ff);
-  trim(group, [14 - pt / 2, ph + 0.03, 0], [0.08, 0.05, 22], 0xff3d8a);
-  trim(group, [0, 0.02, -10.6], [26, 0.03, 0.06], 0x3df0ff, 1.2);
-  trim(group, [-13.6, 0.02, 0], [0.06, 0.03, 20], 0xff3d8a, 1.2);
-  trim(group, [13.6, 0.02, 0], [0.06, 0.03, 20], 0x3df0ff, 1.2);
+  // Neon trim: one merged HDR mesh per colour
+  const cy = [], mg = [];
+  trim(cy, [0, ph + 0.03, -11 + pt / 2], [28, 0.05, 0.08]);
+  trim(mg, [-8, ph + 0.03, 11 - pt / 2], [12, 0.05, 0.08]);
+  trim(mg, [8, ph + 0.03, 11 - pt / 2], [12, 0.05, 0.08]);
+  trim(cy, [-14 + pt / 2, ph + 0.03, 0], [0.08, 0.05, 22]);
+  trim(mg, [14 - pt / 2, ph + 0.03, 0], [0.08, 0.05, 22]);
+  trim(cy, [0, -2.47, 12.1], [14, 0.04, 0.07]);
+  trim(mg, [-7, -2.47, 17], [0.07, 0.04, 10]);
+  trim(mg, [7, -2.47, 17], [0.07, 0.04, 10]);
+  trim(cy, [0, -2.47, 21.95], [14, 0.04, 0.07]);
+  trimMesh(group, cy, 0x3df0ff);
+  trimMesh(group, mg, 0xff3d8a);
 
   // Vault crate directly ahead of spawn (facing +Z) — keep the sprint/vault lane clear
-  box({
-    id: 'vault-crate',
-    size: [1.5, 0.84, 1.0],
-    pos: [0, 0.42, 7.0],
-    mat: mats.rust,
-    userData: { solid: true, ground: true, vaultable: true },
-  });
+  box({ id: 'vault-crate', size: [1.5, 0.84, 1.0], pos: [0, 0.42, 7.0], mat: mats.rust, userData: { solid: true, ground: true, vaultable: true } });
   box({ size: [1.1, 1.1, 1.1], pos: [-4.2, 0.55, 4.2], mat: mats.rust, userData: { solid: true, ground: true, vaultable: true } });
   box({ size: [0.9, 0.55, 0.9], pos: [-4.2, 1.38, 4.2], mat: mats.metal, userData: { solid: true, ground: true, vaultable: true } });
   box({ size: [2.2, 0.7, 1.2], pos: [5.5, 0.35, 6], mat: mats.metal, userData: { solid: true, ground: true, vaultable: true } });
 
-  // AC units / antennas (greybox keepers, dressed with Krea HVAC nearby)
+  // AC units / antennas
   box({ size: [1.8, 1.05, 1.1], pos: [-8.5, 0.53, -6.5], mat: mats.metal, userData: { solid: true } });
   box({ size: [0.12, 2.4, 0.12], pos: [-8.5, 2.25, -6.5], mat: mats.metal, userData: { solid: true, ground: false } });
   box({ size: [1.6, 0.9, 1.0], pos: [9.2, 0.45, -7], mat: mats.metal, userData: { solid: true } });
   const dish = new THREE.Mesh(new THREE.CircleGeometry(0.7, 16), mats.metal);
   dish.position.set(9.2, 1.3, -7); dish.rotation.x = -Math.PI * 0.65; group.add(dish);
 
-  // Uneven ground patch (foot IK)
-  let k = 0;
-  for (let ix = 0; ix < 6; ix++) for (let iz = 0; iz < 5; iz++) {
-    const h = 0.08 + ((ix * 3 + iz * 5) % 7) * 0.045;
-    box({
-      id: `uneven-${k++}`,
-      size: [0.95, h, 0.95],
-      pos: [5.2 + ix * 0.95, h / 2, -3.2 + iz * 0.95],
-      mat: mats.concrete,
-      userData: { solid: true, ground: true },
-      cast: false,
-    });
+  // Uneven ground patch (foot IK): colliders per slab, one merged visual
+  {
+    const slabs = [];
+    let k = 0;
+    for (let ix = 0; ix < 6; ix++) for (let iz = 0; iz < 5; iz++) {
+      const h = 0.08 + ((ix * 3 + iz * 5) % 7) * 0.045;
+      const r = box({ id: `uneven-${k++}`, size: [0.95, h, 0.95], pos: [5.2 + ix * 0.95, h / 2, -3.2 + iz * 0.95], mat: mats.concrete, userData: { solid: true, ground: true }, cast: false });
+      r.mesh.visible = false;
+      const g = new THREE.BoxGeometry(0.93, h, 0.93);
+      g.translate(5.2 + ix * 0.95, h / 2, -3.2 + iz * 0.95);
+      slabs.push(g);
+    }
+    const mesh = new THREE.Mesh(mergeGeometries(slabs), mats.concrete);
+    slabs.forEach((g) => g.dispose());
+    mesh.receiveShadow = true; mesh.castShadow = true;
+    group.add(mesh);
   }
 
   // Ramp up to a short raised platform (slopes)
-  box({
-    id: 'ramp',
-    size: [2.4, 0.22, 5.2],
-    pos: [-7.5, 0.55, 1.2],
-    rot: [-0.28, 0, 0],
-    mat: mats.concrete,
-    userData: { solid: true, ground: true },
-  });
+  box({ id: 'ramp', size: [2.4, 0.22, 5.2], pos: [-7.5, 0.55, 1.2], rot: [-0.28, 0, 0], mat: mats.concrete, userData: { solid: true, ground: true } });
   box({ size: [2.6, 0.3, 2.4], pos: [-7.5, 1.2, 4.4], mat: mats.concrete, userData: { solid: true, ground: true } });
 
-  // Lower connecting roof (+Z) — a drop / later escape path. Enemy encounters live here; leave it open.
-  box({ id: 'roof-low', size: [14, 0.6, 10], pos: [0, -2.8, 17], mat: mats.wet, userData: { solid: true, ground: true }, cast: false });
+  // Lower roof cover crate. Enemy encounters live here; leave it open.
   box({ size: [1.2, 0.7, 1.2], pos: [0, -2.15, 14.2], mat: mats.rust, userData: { solid: true, ground: true, vaultable: true } });
-  trim(group, [0, -2.48, 12.1], [14, 0.04, 0.07], 0x3df0ff, 1.3);
 
   // Krea props along the edges and as cover — never in the +Z sprint/vault lane (x≈0, z=0..8)
   // or on the lower-roof encounter (x≈-6..6, z≈15..20).
-  placeProp(group, physics, ids, props, 'hvac_neon', -11.2, -8.2, 0.2, true);
-  placeProp(group, physics, ids, props, 'hvac_neon', 11.4, -8.4, -0.4, true);
-  placeProp(group, physics, ids, props, 'speaker_stack', -12.2, 4.2, 0.3, true);
-  placeProp(group, physics, ids, props, 'speaker_stack', 12.0, 7.4, -0.5, true);
-  placeProp(group, physics, ids, props, 'crate', -6.6, -4.2, 0.4, true);
-  placeProp(group, physics, ids, props, 'crate', 8.2, 3.4, -0.2, true);
-  placeProp(group, physics, ids, props, 'crate', 7.4, -8.0, 0.7, true);
-  placeProp(group, physics, ids, props, 'monolith', -12.6, 8.6, 0.15, true, 0.22);
-  placeProp(group, physics, ids, props, 'resonance_ring', 12.2, -4.5, 0, false, 0.4, 0.4);
-  placeProp(group, physics, ids, props, 'gate_arch', 0, 21.6, 0, false, 0.7, -0.4);
-  placeProp(group, physics, ids, props, 'panel_block', 24, -16, -0.35, false, 1, -8);
+  const P = (name, x, z, o) => placeProp(group, physics, ids, props, name, x, z, o);
+  P('hvac_neon', -11.2, -8.2, { yaw: 0.2, collide: true });
+  P('hvac_neon', 11.4, -8.4, { yaw: -0.4, collide: true });
+  P('speaker_stack', -12.2, 4.2, { yaw: 0.3, collide: true });
+  P('speaker_stack', 12.0, 7.4, { yaw: -0.5, collide: true });
+  P('crate', -6.6, -4.2, { yaw: 0.4, collide: true });
+  P('crate', 8.2, 3.4, { yaw: -0.2, collide: true });
+  P('crate', 7.4, -8.0, { yaw: 0.7, collide: true });
+  P('monolith', -12.6, 8.6, { yaw: 0.15, collide: true, scale: 0.22 });
+  P('resonance_ring', 12.2, -4.5, { scale: 0.4, y: 0.4 });
+  P('panel_block', 26, -18, { yaw: -0.35, y: -8 });
 
-  // Glass office tower with amuNet neon (backdrop)
-  const tower = new THREE.Group(); tower.position.set(-22, 0, -40);
-  const towerBody = new THREE.Mesh(new THREE.BoxGeometry(10, 28, 8), mats.glass);
-  towerBody.position.y = 14; towerBody.castShadow = false; tower.add(towerBody);
-  const winMat = makeMat({ color: 0x0b1520, emissive: 0x3a5a80, emissiveIntensity: 0.55, roughness: 0.2, metalness: 0.6 });
-  for (let i = 0; i < 10; i++) {
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(9.4, 0.35, 8.1), winMat);
-    strip.position.y = 2 + i * 2.4; strip.castShadow = false; tower.add(strip);
+  // ---------- company tower (backdrop) ----------
+  const company = (strings && strings.company) || '';
+  const tower = new THREE.Group(); tower.position.set(-22, -14, -40);
+  tower.rotation.y = 0.45;
+  const towerBody = new THREE.Mesh(new THREE.BoxGeometry(11, 46, 9), mats.glass);
+  towerBody.position.y = 23; tower.add(towerBody);
+  {
+    const strips = [];
+    for (let i = 0; i < 17; i++) { const g = new THREE.BoxGeometry(11.1, 0.4, 9.1); g.translate(0, 3 + i * 2.5, 0); strips.push(g); }
+    const m = new THREE.Mesh(mergeGeometries(strips), new THREE.MeshBasicMaterial({ color: new THREE.Color(0x3a6a90).multiplyScalar(0.9) }));
+    strips.forEach((g) => g.dispose());
+    tower.add(m);
   }
-  const company = (strings && strings.company) || 'amuNet';
-  const sign = neonSign(company, { color: 0xff3d8a, w: 7.2, h: 1.6 });
-  sign.position.set(0, 12.2, 4.15);
-  tower.add(sign);
-  const signCyan = neonSign(company, { color: 0x3df0ff, w: 7.2, h: 1.6 });
-  signCyan.position.set(0.08, 12.12, 4.12);
-  signCyan.material.opacity = 0.85; signCyan.material.transparent = true;
-  signCyan.material.toneMapped = false; signCyan.material.emissiveIntensity = 2.2;
-  tower.add(signCyan);
+  if (company) {
+    const sign = neonText(company, { color: 0xff3d8a, w: 9.6, h: 2.4, gain: 3.2 });
+    sign.position.set(0, 34, 4.62);
+    tower.add(sign);
+    const echo = neonText(company, { color: 0x3df0ff, w: 9.6, h: 2.4, gain: 1.6, backing: false });
+    echo.position.set(0.14, 33.9, 4.66);
+    tower.add(echo);
+  }
   group.add(tower);
 
-  // Neon signs on the roof that actually light the deck
-  const roofSign = neonSign('AEGIS', { color: 0x3df0ff, w: 3.6, h: 0.7 });
-  roofSign.position.set(-13.55, 2.1, -2.5);
-  roofSign.rotation.y = Math.PI / 2;
-  group.add(roofSign);
-  const roofSignM = neonSign('GRID', { color: 0xff3d8a, w: 3.2, h: 0.65 });
-  roofSignM.position.set(13.55, 1.9, 2.8);
-  roofSignM.rotation.y = -Math.PI / 2;
-  group.add(roofSignM);
+  // ---------- roof signage ----------
+  const signs = [];
+  const post = (x, h, z, baseY = 0) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.14, h, 0.14), mats.metal);
+    m.position.set(x, h / 2 + baseY, z);
+    group.add(m);
+  };
+  const addSign = (text, color, w, h, pos, yaw, lightDist = 16) => {
+    const s = neonText(text, { color, w, h, gain: 2.8 });
+    s.position.set(...pos); s.rotation.y = yaw;
+    group.add(s);
+    const l = new THREE.PointLight(color, 6, lightDist, 1.6);
+    l.position.set(pos[0] + Math.sin(yaw) * 1.0, pos[1], pos[2] + Math.cos(yaw) * 1.0);
+    group.add(l);
+    const halo = glowSprite(color, 5.5, 0.2);
+    halo.position.copy(l.position); group.add(halo);
+    signs.push({ mat: s.userData.text.material, base: s.userData.text.material.color.clone(), light: l, li: 6, seed: signs.length * 3.7 });
+    return s;
+  };
+  post(-13.6, 2.6, -4.2); post(-13.6, 2.6, -0.8); post(13.6, 2.4, 1.3); post(13.6, 2.4, 4.3);
+  addSign('AEGIS', 0x3df0ff, 3.8, 0.9, [-13.5, 2.2, -2.5], Math.PI / 2);
+  addSign('GRID', 0xff3d8a, 3.2, 0.85, [13.5, 2.0, 2.8], -Math.PI / 2);
 
-  addSkyline(group);
-
-  // Distant mountain silhouettes (Vitosha-ish)
-  const mtMat = makeMat({ color: 0x0b1018, roughness: 1, metalness: 0 });
-  for (const [x, z, s] of [[-40, -80, 28], [10, -90, 36], [50, -85, 24]]) {
-    const m = new THREE.Mesh(new THREE.ConeGeometry(s * 0.8, s, 5), mtMat);
-    m.position.set(x, s * 0.3, z); m.rotation.y = 0.4; m.castShadow = false; group.add(m);
+  // ---------- skyline, sky, haze ----------
+  const beacons = [];
+  addSkyline(group, beacons);
+  const sky = skyDome({ top: 0x03060b, horizon: 0x0c1a26, glow: 0x16303f, glowPower: 5, radius: 190 });
+  group.add(sky);
+  const beaconSprites = beacons.map((p, i) => {
+    const s = glowSprite(0xff2030, 2.6, 0.9);
+    s.position.copy(p); group.add(s);
+    return { s, ph: i * 1.3 };
+  });
+  // street-level glow rising between the towers
+  for (const [x, z, c, s] of [[-30, -30, 0xff3d8a, 60], [28, -34, 0x3df0ff, 64], [0, 46, 0xffb060, 56], [44, 10, 0xff3d8a, 44], [-46, 8, 0x3df0ff, 48]]) {
+    const g = glowSprite(c, s, 0.12);
+    g.position.set(x, -12, z); group.add(g);
   }
+  // searchlights sweeping from distant roofs
+  const beams = [];
+  for (const [x, y, z, c] of [[30, 6.5, -12, 0x9fdcff], [-32, 10.5, -10, 0xff9ac4], [8, 12.5, -34, 0x9fdcff]]) {
+    const cone = lightCone({ color: c, height: 70, radius: 5, topRadius: 0.3, opacity: 0.2 });
+    const pivot = new THREE.Group();
+    pivot.position.set(x, y, z);
+    cone.rotation.x = Math.PI; // point up
+    pivot.add(cone);
+    group.add(pivot);
+    beams.push({ pivot, ph: x * 0.1 });
+  }
+  // lamp posts with light cones (fake volumetrics in the rain)
+  const lamp = (x, h, z, color, baseY = 0) => {
+    post(x, h, z, baseY);
+    const cone = lightCone({ color, height: h + 0.2, radius: 2.6, topRadius: 0.12, opacity: 0.3 });
+    cone.position.set(x, h + baseY, z); group.add(cone);
+    const halo = glowSprite(color, 1.6, 0.9); halo.position.set(x, h + baseY, z); group.add(halo);
+    const l = new THREE.PointLight(color, 14, 13, 1.6); l.position.set(x, h - 0.3 + baseY, z); group.add(l);
+  };
+  lamp(-13.3, 4.2, 9.6, 0xbfe6ff);
+  lamp(13.3, 4.2, -9.8, 0xbfe6ff);
+  lamp(-6.7, 4.0, 21.6, 0xffc890, -2.5);
+  lamp(6.7, 4.0, 21.6, 0xbfe6ff, -2.5);
 
-  // Lighting: one shadow-casting key, a cyan rim, hemi fill, neon points
-  const hemi = new THREE.HemisphereLight(0x9ad4ff, 0x1a1020, 1.05);
+  // ---------- lighting: one shadow key, coloured rims, soft fill ----------
+  const hemi = new THREE.HemisphereLight(0x8ab8e0, 0x150c1c, 0.7);
   group.add(hemi);
-  const key = new THREE.DirectionalLight(0xe8f2ff, 2.15);
+  const key = new THREE.DirectionalLight(0xdbe8ff, 1.5);
   key.position.set(-12, 22, 8);
   key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.mapSize.set(2048, 2048);
   key.shadow.camera.near = 1; key.shadow.camera.far = 60;
   key.shadow.camera.left = -22; key.shadow.camera.right = 22;
-  key.shadow.camera.top = 22; key.shadow.camera.bottom = -22;
-  key.shadow.bias = -0.0008;
+  key.shadow.camera.top = 26; key.shadow.camera.bottom = -18;
+  key.shadow.bias = -0.0006; key.shadow.normalBias = 0.03;
+  key.shadow.radius = 3;
   group.add(key); group.add(key.target);
-  const rim = new THREE.DirectionalLight(0x40e8ff, 1.55);
-  rim.position.set(10, 10, -14); rim.castShadow = false; group.add(rim);
-  const magRim = new THREE.DirectionalLight(0xff4da0, 0.55);
-  magRim.position.set(-8, 8, 12); magRim.castShadow = false; group.add(magRim);
-
-  // Signs cast colored light onto the wet deck (no shadows)
-  const neonM = new THREE.PointLight(0xff3d8a, 28, 48, 1.15); neonM.position.set(-22, 14, -34); group.add(neonM);
-  const neonC = new THREE.PointLight(0x3df0ff, 28, 48, 1.15); neonC.position.set(-20, 13, -34); group.add(neonC);
-  const signC = new THREE.PointLight(0x3df0ff, 10, 18, 1.4); signC.position.set(-12.5, 2.2, -2.5); group.add(signC);
-  const signM = new THREE.PointLight(0xff3d8a, 10, 18, 1.4); signM.position.set(12.5, 2.0, 2.8); group.add(signM);
-  const roofFill = new THREE.PointLight(0xc0d8ee, 4.5, 28, 1.3); roofFill.position.set(0, 7, 2); group.add(roofFill);
+  const rim = new THREE.DirectionalLight(0x40e8ff, 2.0);
+  rim.position.set(10, 9, -14); group.add(rim);
+  const magRim = new THREE.DirectionalLight(0xff4da0, 0.6);
+  magRim.position.set(-10, 7, 14); group.add(magRim);
 
   let envRT = null;
   if (renderer) {
-    envRT = makeNightEnv(renderer);
+    envRT = makeEnv(renderer, {
+      sky: 0x0d1b28, hemiTop: 0x6fb4d8, hemiBottom: 0x1a1020, hemi: 1.0,
+      cards: [
+        { color: 0x3df0ff, gain: 2.2, pos: [-18, 6, -18], size: [10, 6] },
+        { color: 0xff3d8a, gain: 2.2, pos: [18, 5, -14], size: [10, 6] },
+        { color: 0xffc070, gain: 1.4, pos: [0, -3, -24], size: [30, 3] },
+        { color: 0xff3d8a, gain: 1.4, pos: [-14, 4, 20], size: [8, 5] },
+        { color: 0x3df0ff, gain: 1.2, pos: [16, 8, 18], size: [8, 5] },
+      ],
+    });
     scene.environment = envRT.texture;
-    if ('environmentIntensity' in scene) scene.environmentIntensity = 0.9;
+    if ('environmentIntensity' in scene) scene.environmentIntensity = 0.75;
   }
 
-  const rain = createRain(ctx.tuning, group);
+  const rain = createRain(tuning, group);
 
   const spawn = new THREE.Vector3(0, 0, 0);
+  // Escape route: clear the lower roof, then drop through the gate into the Cradle.
   const portals = [
-    { to: 'arena', pos: new THREE.Vector3(0, -2.5, 20), radius: 1.8, label: 'ARENA', locked: true },
+    { to: 'cradle', pos: new THREE.Vector3(0, -2.5, 20), radius: 1.8, label: 'CRADLE', locked: true },
   ];
+  let arch = null;
+  if (props?.gate_arch?.root) {
+    arch = props.gate_arch.root.clone(true);
+    arch.scale.multiplyScalar(0.7);
+    arch.position.set(0, props.gate_arch.root.position.y * 0.7 - 0.1, 0.9);
+  }
+  const gate = portalGate(group, portals[0], { color: 0x3df0ff, arch });
 
   scene.add(group);
+  let t = 0;
+  let groundY = 0;
   return {
     name: 'rooftop',
     group,
@@ -351,16 +346,37 @@ export function createRooftop(ctx) {
     enemies: [],
     rain,
     physicsIds: ids,
-    fog: { color: 0x08141c, density: 0.018 },
-    clearColor: 0x071018,
-    exposure: 1.55,
-    far: 220,
+    fog: { color: 0x0b1822, density: 0.011 },
+    clearColor: 0x05090f,
+    exposure: 1.2,
+    far: 260,
     update(dt, playerPos) {
+      t += dt;
+      // splashes sit on whichever deck the player is over
+      const target = playerPos.z > 11.5 ? -2.5 : 0;
+      groundY += (target - groundY) * Math.min(1, dt * 6);
       rain.setOrigin(playerPos);
+      rain.setGround(groundY);
       rain.update(dt);
+      for (const d of decks) d.update(t);
+      gate.update(dt);
+      sky.position.set(playerPos.x, 0, playerPos.z);
+      for (const b of beaconSprites) b.s.material.opacity = 0.25 + 0.75 * Math.max(0, Math.sin(t * 2.2 + b.ph)) ** 4;
+      for (const b of beams) {
+        b.pivot.rotation.z = Math.sin(t * 0.21 + b.ph) * 0.5;
+        b.pivot.rotation.x = Math.cos(t * 0.17 + b.ph * 2) * 0.4;
+      }
+      // neon tubes buzz: mostly steady, with the odd dropout
+      for (const s of signs) {
+        const n = Math.sin(t * 31 + s.seed) * Math.sin(t * 7.3 + s.seed * 2);
+        const k = n > 0.93 ? 0.35 : 0.94 + 0.06 * Math.sin(t * 50 + s.seed);
+        s.mat.color.copy(s.base).multiplyScalar(k);
+        s.light.intensity = s.li * k;
+      }
     },
     unload() {
       rain.dispose();
+      for (const d of decks) d.dispose();
       if (envRT && scene.environment === envRT.texture) scene.environment = null;
       envRT?.dispose();
       envRT = null;

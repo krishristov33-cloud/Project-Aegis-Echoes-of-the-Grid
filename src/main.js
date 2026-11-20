@@ -4,7 +4,7 @@ import { Time } from './core/time.js';
 import { input, bindInput, endFrame, setScriptedInput, clearScriptedInput, keyJust, wantsBlink, wantsPhaseSkip, wantsWaveShield, wantsLaunchpad } from './core/input.js';
 import { loadManifest, loadRole, initAssets, loadProp } from './core/assets.js';
 import { createAudioClock } from './core/audio-clock.js';
-import { PhysicsWorld } from './core/physics.js';
+import { initRapier, RapierWorld } from './physics/rapier-world.js';
 import { createPlayer } from './player/controller.js';
 import { ThirdPersonCamera } from './player/camera.js';
 import { createRooftop } from './world/rooftop.js';
@@ -20,6 +20,8 @@ import { createBlink } from './player/powers/blink.js';
 import { createPowers } from './player/powers/powers.js';
 import { createMixHealth } from './audio/mixhealth.js';
 import { createSidechain } from './audio/sidechain.js';
+import { createPost } from './fx/post.js';
+import { createSfx } from './audio/sfx.js';
 
 const QS = new URLSearchParams(location.search);
 const DEBUG = QS.has('debug') || QS.has('shots');
@@ -31,9 +33,10 @@ async function loadJSON(url) {
   return r.json();
 }
 
-function resize(renderer, camera) {
+function resize(renderer, camera, post) {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
+  post?.resize?.(w, h);
   camera.aspect = w / Math.max(1, h);
   camera.updateProjectionMatrix();
 }
@@ -59,24 +62,27 @@ async function boot() {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(tuning.camera?.fov ?? 60, 1, 0.1, 200);
-  resize(renderer, camera);
-  addEventListener('resize', () => resize(renderer, camera));
+  const post = createPost({ renderer, scene, camera, tuning, bus });
+  resize(renderer, camera, post);
+  addEventListener('resize', () => resize(renderer, camera, post));
 
   await initAssets(renderer);
 
-  const PROP_NAMES = ['hvac_neon', 'speaker_stack', 'panel_block', 'crate', 'resonance_ring', 'monolith', 'gate_arch'];
+  const PROP_NAMES = ['hvac_neon', 'speaker_stack', 'panel_block', 'crate', 'resonance_ring', 'monolith', 'gate_arch', 'crystals', 'altar'];
   const props = {};
   await Promise.all(PROP_NAMES.map(async (n) => {
     try { props[n] = await loadProp(n, manifest); }
     catch (err) { console.warn('[assets] prop', n, err); }
   }));
 
-  const physics = new PhysicsWorld();
+  await initRapier();
+  const physics = new RapierWorld();
   const time = new Time();
   if (SHOTS) time.maxDt = 0.08; // headless swiftshader runs few frames; let sim catch up
   const clock = createAudioClock(bus, tuning);
   createMixHealth(bus);
   createSidechain(bus);
+  const sfx = createSfx({ bus, clock, tuning });
 
   const hud = createHud({ root: document.getElementById('hud'), strings, bus, debug: DEBUG });
   const tempo = createTempoWidget({ root: document.getElementById('hud'), bus, strings });
@@ -107,9 +113,24 @@ async function boot() {
 
   const orbit = new ThirdPersonCamera(camera, tuning);
 
+  // Character lights: a cool rim from beyond the player and a soft fill from the camera, so the hero and
+  // anything close to him read against the dark levels. Short range, no shadows.
+  const CL = tuning.characterLight || {};
+  const rimLight = new THREE.PointLight(new THREE.Color(CL.rimColor ?? '#a8ecff'), CL.rimIntensity ?? 26, CL.rimDistance ?? 7, 2);
+  const fillLight = new THREE.PointLight(new THREE.Color(CL.fillColor ?? '#ffe6d0'), CL.fillIntensity ?? 9, CL.fillDistance ?? 9, 2);
+  scene.add(rimLight, fillLight);
+  const _camFwd = new THREE.Vector3();
+  function placeCharacterLights() {
+    camera.getWorldDirection(_camFwd).setY(0).normalize();
+    rimLight.position.copy(player.position).addScaledVector(_camFwd, CL.rimBack ?? 2.2);
+    rimLight.position.x += -_camFwd.z * (CL.rimSide ?? 1.1); rimLight.position.z += _camFwd.x * (CL.rimSide ?? 1.1);
+    rimLight.position.y += CL.rimUp ?? 2.4;
+    fillLight.position.copy(camera.position); fillLight.position.y += CL.fillUp ?? 0.6;
+  }
+
   const encounters = createEncounters({
     bus, scene, physics, player, enemies, manifest,
-    data: { enemies: enemiesData, strings },
+    data: { enemies: QS.has('noai') ? { ...enemiesData, encounters: {} } : enemiesData, strings },
   });
 
   const flow = createEncounterFlow({ bus, scene, player, enemies, strings });
@@ -171,6 +192,7 @@ async function boot() {
     clock,
     input,
     get level() { return current?.name; },
+    get current() { return current; },
     get ai() { return encounters.ai; },
     encounters,
     blink,
@@ -180,8 +202,40 @@ async function boot() {
     strings,
     manifest,
     enemies,
+    post,
+    sfx,
+    orbit,
+    paused: false,
+    /** Freeze the sim for `sec` real seconds (hit-stop). Longest request wins. */
+    hitstop(sec) { hitstopUntil = Math.max(hitstopUntil, performance.now() / 1000 + sec); },
+    /** Seconds left on each power, for the HUD: { blink, phaseSkip, waveShield, launchpad, blast } each {left, total}. */
+    cooldowns() {
+      return {
+        blast: { left: player.combat.blastCd, total: tuning.combat?.blastCooldown ?? 2.5 },
+        blink: { left: blink.cooldownLeft ?? 0, total: powers.blink?.cooldown ?? 2.8 },
+        phaseSkip: { left: c3.phaseSkip.cooldownLeft ?? 0, total: powers.phaseSkip?.cooldown ?? 3.2 },
+        waveShield: { left: c3.waveShield.cooldownLeft ?? 0, total: powers.waveShield?.cooldown ?? 8 },
+        launchpad: { left: c3.launchpad.cooldownLeft ?? 0, total: powers.launchpad?.cooldown ?? 3 },
+      };
+    },
   };
+  let hitstopUntil = 0;
   window.game = game;
+  if (post.setEnabled === undefined) post.setEnabled = (on) => { post.enabled = !!on; };
+  if (post.enabled !== false) document.getElementById('vign')?.remove(); // the post stack has its own vignette
+
+  // One event drives all the hit feel: freeze frames, camera shake and kick (sfx, vfx and post listen too).
+  const HS = tuning.combat?.hitstop || {};
+  const CT = tuning.camera || {};
+  bus.on('impact', (e) => {
+    const s = Math.max(0, Math.min(1, e?.strength ?? 0.3));
+    if (e.kind === 'land') { orbit.addTrauma(s * (CT.landTrauma ?? 0.35)); orbit.kick(-s * 0.02); return; }
+    if (e.kind === 'hurt') { orbit.addTrauma(0.2 + s * (CT.hurtTrauma ?? 0.5)); game.hitstop(0.03 + s * 0.04); return; }
+    orbit.addTrauma(s * (CT.impactTrauma ?? 0.42));
+    orbit.kick((CT.impactKick ?? 0.012) * (0.5 + s));
+    if (e.release) return; // the blast release shakes; only landed hits freeze
+    game.hitstop((HS.base ?? 0.035) + s * (HS.perStrength ?? 0.07) + (e.kind === 'kill' ? (HS.kill ?? 0.05) : 0) + (e.onBeat ? (HS.onBeat ?? 0.02) : 0));
+  });
   const fx = initFX(game);
   window.AG = {
     version: '0.1.0',
@@ -229,8 +283,11 @@ async function boot() {
     setInput: setScriptedInput,
     clearInput: clearScriptedInput,
     jump() { pawn.jump(); },
+    dodge() { pawn.dodge(); },
     tryVault() { return pawn.tryVault(orbit.yaw); },
+    pose(name, t) { return pawn.loco.debugPose(name, t); },
     attack() { player.combat.requestMelee(); },
+    pawn,
     blast() { player.combat.requestBlast(); },
     blinkNow() { return blink.trigger(orbit.yaw); },
     damage(n) { player.takeDamage(n ?? 10, 'debug'); },
@@ -254,7 +311,14 @@ async function boot() {
   let portalLock = 0;
   function tick() {
     requestAnimationFrame(tick);
+    time.scale = performance.now() / 1000 < hitstopUntil ? 0.04 : (game.timeScale ?? 1);
     const dt = time.tick();
+    if (game.paused) {
+      // menus own the screen: keep drawing the frozen frame, drop gameplay input
+      post.render(0);
+      endFrame();
+      return;
+    }
     clock.update(dt);
 
     if (DEBUG && keyJust('Digit1')) goto('rooftop');
@@ -262,8 +326,13 @@ async function boot() {
     if (DEBUG && keyJust('Digit3')) goto('chamber');
     if (DEBUG && keyJust('Digit4')) goto('arena');
 
-    pawn.update(dt, orbit.yaw);
+    // behind the title the world idles: no enemy AI, a slow orbit around Kael
+    const onTitle = hud.screens?.mode === 'title';
+    if (onTitle) orbit.yaw += dt * (tuning.camera?.titleOrbit ?? 0.07);
+    pawn.update(dt, orbit.yaw, orbit.pitch);
+    orbit.setSpeed(Math.hypot(player.velocity.x, player.velocity.z));
     orbit.update(dt, player.position, physics);
+    placeCharacterLights();
     if (wantsBlink()) blink.trigger(orbit.yaw);
     if (wantsPhaseSkip()) c3.phaseSkip.trigger(orbit.yaw);
     if (wantsWaveShield()) c3.waveShield.trigger(orbit.yaw);
@@ -271,8 +340,7 @@ async function boot() {
     blink.update(dt);
     c3.update(dt);
     current?.update?.(dt, player.position, bus);
-    flow.update(dt, current);
-    encounters.update(dt);
+    if (!onTitle) { flow.update(dt, current); encounters.update(dt); }
     fx.update(dt);
 
     if (portalLock > 0) portalLock -= dt;
@@ -281,7 +349,7 @@ async function boot() {
         if (p.locked) continue;
         const d = player.position.distanceTo(p.pos);
         if (d < (p.radius ?? 1.6) + 0.4) {
-          hud.setPrompt(`${p.label || p.to}  ·  walk in`);
+          hud.setPrompt(`${p.label || p.to}  ·  ${strings.hud?.walkIn || 'walk in'}`);
           if (d < p.radius) { portalLock = 1.0; goto(p.to); hud.setPrompt(''); break; }
         } else {
           hud.setPrompt('');
@@ -289,7 +357,8 @@ async function boot() {
       }
     }
 
-    renderer.render(scene, camera);
+    sfx.update?.(dt);
+    post.render(dt);
 
     hud.update({
       state: player.state,

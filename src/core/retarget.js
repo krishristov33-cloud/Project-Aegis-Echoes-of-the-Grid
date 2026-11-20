@@ -142,6 +142,7 @@ export function retargetClips(clips, ctx = {}) {
     const qVals = new Map(slots.map((c) => [c, new Float32Array(times.length * 4)]));
     const pVals = new Float32Array(times.length * 3);
     const action = mixer.clipAction(clip);
+    action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; // t = duration must sample the last key, not wrap to 0
     action.reset().play();
     const rr = new Map(); // target node -> root-relative quat this frame
     for (let i = 0; i < times.length; i++) {

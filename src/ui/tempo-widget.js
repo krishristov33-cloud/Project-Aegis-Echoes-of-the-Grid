@@ -10,6 +10,7 @@ export function createTempoWidget({ root, bus, strings }) {
   wrap.innerHTML = `
     <svg viewBox="0 0 100 100" aria-hidden="true">
       <circle class="ring-track" cx="50" cy="50" r="40" />
+      <circle class="ring-win" cx="50" cy="50" r="40" />
       <circle class="ring-phase" cx="50" cy="50" r="40" />
       <circle class="ring-pulse" cx="50" cy="50" r="44" />
     </svg>
@@ -23,6 +24,11 @@ export function createTempoWidget({ root, bus, strings }) {
   const C = 2 * Math.PI * 40;
   phaseEl.style.strokeDasharray = `${C}`;
   phaseEl.style.strokeDashoffset = `${C}`;
+  // gold arc = the on-beat window (|phase| < 0.12 either side of the beat, which sits at 12 o'clock)
+  const winEl = wrap.querySelector('.ring-win');
+  const WIN = 0.12;
+  winEl.style.strokeDasharray = `${C * WIN * 2} ${C}`;
+  winEl.style.transform = `rotate(${-90 - WIN * 360}deg)`;
   pulseEl.style.opacity = '0';
 
   let last = { t: performance.now(), bpm: 0, index: 0 };

@@ -1,5 +1,6 @@
 // Rooftop wave flow, a 2-shooter cap, and a cheap aim telegraph.
 // Does not edit src/ai: parks wave-2 agents, wraps weapon.update, and draws a wind-up line.
+// Also drives the HUD objective line for every level: emits `objective {level, key, text}` when it changes.
 import * as THREE from 'three';
 
 export function createEncounterFlow({ bus, scene, player, enemies, strings }) {
@@ -21,6 +22,17 @@ export function createEncounterFlow({ bus, scene, player, enemies, strings }) {
     return 'Drone inbound! More on the roof!';
   };
 
+  // ---------- objective line ----------
+  const O = strings?.hud?.objectives || {};
+  let objKey = '';
+  let levelT = 0;
+  function objective(key, n) {
+    const id = n === undefined ? key : `${key}:${n}`;
+    if (id === objKey || !O[key]) return;
+    objKey = id;
+    bus.emit('objective', { level, key, text: String(O[key]).replace('{n}', n) });
+  }
+
   bus.on('levelState', (e) => {
     if (e?.phase !== 'enter') return;
     unparkAll();
@@ -29,7 +41,20 @@ export function createEncounterFlow({ bus, scene, player, enemies, strings }) {
     phase = level === 'rooftop' ? 'wave1' : 'off';
     waitT = 0;
     armed = false;
+    levelT = 0;
+    objKey = '';
+    objective(level);
   });
+  bus.on('puzzleState', (e) => {
+    if (level !== 'chamber' || (e?.level && e.level !== level)) return;
+    if (e.phase === 'listen') objective('chamberListen');
+    else if (e.phase === 'answer' || e.phase === 'chord') objective('chamberPlay');
+    else if (e.phase === 'solved') objective('chamberSolved');
+    else if (e.phase === 'waiting') objective('chamber');
+  });
+  bus.on('puzzleSolved', () => { if (level === 'chamber') objective('chamberSolved'); });
+  bus.on('bossPhase', (e) => { if (level === 'arena' && (e?.phase ?? 1) >= 2) objective('arenaWeak'); });
+  bus.on('bossDefeated', () => { if (level === 'arena') objective('arenaDone'); });
 
   function park(e) {
     if (e._flowPark) return;
@@ -122,11 +147,21 @@ export function createEncounterFlow({ bus, scene, player, enemies, strings }) {
         armed = true;
       }
     }
+    // If the AI never came up (navmesh CDN blocked, bad data) do not leave the exit locked forever.
+    if (phase === 'wave1' && !armed && levelT > 15 && enemies.length === 0) {
+      phase = 'clear';
+      objective('rooftopClear');
+      if (levelObj?.portals) for (const p of levelObj.portals) p.locked = false;
+      return;
+    }
+    const alive = (list) => list.reduce((n, e) => n + (e.dead ? 0 : 1), 0);
     if (phase === 'wave1') {
       const w1 = bySquad('roof-wave1');
+      if (w1.length && alive(w1) < w1.length) objective('rooftopWave', alive(w1));
       if (armed && w1.length && w1.every((e) => e.dead)) {
         phase = 'wait';
         waitT = 1.0;
+        objective('rooftopBackup');
         bus.emit('callout', { text: incoming(), key: 'waveIncoming', pos: player.position.clone() });
       }
     } else if (phase === 'wait') {
@@ -139,8 +174,10 @@ export function createEncounterFlow({ bus, scene, player, enemies, strings }) {
       const live = enemies.filter((e) => !e.dead && !e._flowPark && e.kind !== 'hulk' && (e.squad?.name === 'roof-wave1' || e.squad?.name === 'roof-wave2' || !e.squad?.name?.startsWith?.('roof')));
       const w1 = bySquad('roof-wave1');
       const w2 = bySquad('roof-wave2');
+      if (w2.length && alive(w2) > 0) objective('rooftopWave', alive(w2));
       if (armed && w1.length && w2.length && w1.every((e) => e.dead) && w2.every((e) => e.dead)) {
         phase = 'clear';
+        objective('rooftopClear');
         bus.emit('levelState', { level: 'rooftop', phase: 'clear' });
         if (levelObj?.portals) for (const p of levelObj.portals) p.locked = false;
       }
@@ -149,6 +186,7 @@ export function createEncounterFlow({ bus, scene, player, enemies, strings }) {
 
   return {
     update(dt, levelObj) {
+      levelT += dt;
       assignShooters();
       rooftopFlow(dt, levelObj);
       telegraph();

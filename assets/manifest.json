@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "note": "Swap a role's url to change the model. boneMap may be an object or the key 'MESHY24_BONE_MAP' (Meshy 24-joint rig; Spine02 is the lowest spine \u2014 never auto-detect). animSource is a donor role whose clips are retargeted through Aether's retargetRole (inPlace). Unrigged roles use scale/yOffset/rotY from MODELS.md. Optimized GLBs in assets/models/ are KTX2 (etc1s color, uastc normals) + meshopt.",
+  "note": "Swap a role's url to change the model. boneMap may be an object or the key 'MESHY24_BONE_MAP' (Meshy 24-joint rig; Spine02 is the lowest spine \u2014 never auto-detect). animSource is a donor role whose clips are retargeted through Aether's retargetRole (inPlace). Unrigged roles use scale/yOffset/rotY from MODELS.md. Optimized GLBs in assets/models/ are KTX2 (etc1s color, uastc normals) + meshopt. A role with procClips:true also gets the procedural clip library (src/anim/clips.js) baked onto it; logical names equal clip names unless clipMap overrides them.",
   "boneMaps": {
     "MESHY24_BONE_MAP": {
       "hips": "Hips",
@@ -38,16 +38,7 @@
         "walk": "walk",
         "jog": "walk",
         "run": "run",
-        "sprint": "run",
-        "jump": null,
-        "fall": null,
-        "land": null,
-        "vault": null,
-        "melee1": "agree",
-        "melee2": "headShake",
-        "melee3": "agree",
-        "blast": "sneak_pose",
-        "hit": "sad_pose"
+        "sprint": "run"
       },
       "boneMap": {
         "hips": "mixamorig:Hips",
@@ -72,7 +63,8 @@
         "rightLowerLeg": "mixamorig:RightLeg",
         "rightFoot": "mixamorig:RightFoot",
         "rightToes": "mixamorig:RightToeBase"
-      }
+      },
+      "procClips": true
     },
     "player": {
       "url": "assets/models/characters/kael.glb",
@@ -84,22 +76,7 @@
       "yOffset": 0,
       "boneMap": "MESHY24_BONE_MAP",
       "emissive": 0.16,
-      "clipMap": {
-        "idle": "idle",
-        "walk": "walk",
-        "jog": "walk",
-        "run": "run",
-        "sprint": "run",
-        "jump": null,
-        "fall": null,
-        "land": null,
-        "vault": null,
-        "melee1": "agree",
-        "melee2": "headShake",
-        "melee3": "agree",
-        "blast": "sneak_pose",
-        "hit": "sad_pose"
-      },
+      "clipMap": {},
       "animSource": "player_anims"
     },
     "soldier": {
@@ -112,22 +89,7 @@
       "yOffset": 0,
       "boneMap": "MESHY24_BONE_MAP",
       "emissive": 0.16,
-      "clipMap": {
-        "idle": "idle",
-        "walk": "walk",
-        "jog": "walk",
-        "run": "run",
-        "sprint": "run",
-        "jump": null,
-        "fall": null,
-        "land": null,
-        "vault": null,
-        "melee1": "agree",
-        "melee2": "headShake",
-        "melee3": "agree",
-        "blast": "sneak_pose",
-        "hit": "sad_pose"
-      },
+      "clipMap": {},
       "animSource": "player_anims"
     },
     "exosuit": {
@@ -140,22 +102,7 @@
       "yOffset": 0,
       "boneMap": "MESHY24_BONE_MAP",
       "emissive": 0.16,
-      "clipMap": {
-        "idle": "idle",
-        "walk": "walk",
-        "jog": "walk",
-        "run": "run",
-        "sprint": "run",
-        "jump": null,
-        "fall": null,
-        "land": null,
-        "vault": null,
-        "melee1": "agree",
-        "melee2": "headShake",
-        "melee3": "agree",
-        "blast": "sneak_pose",
-        "hit": "sad_pose"
-      },
+      "clipMap": {},
       "animSource": "player_anims"
     },
     "hulk": {
@@ -168,22 +115,7 @@
       "yOffset": 0,
       "boneMap": "MESHY24_BONE_MAP",
       "emissive": 0.12,
-      "clipMap": {
-        "idle": "idle",
-        "walk": "walk",
-        "jog": "walk",
-        "run": "run",
-        "sprint": "run",
-        "jump": null,
-        "fall": null,
-        "land": null,
-        "vault": null,
-        "melee1": "agree",
-        "melee2": "headShake",
-        "melee3": "agree",
-        "blast": "sneak_pose",
-        "hit": "sad_pose"
-      },
+      "clipMap": {},
       "animSource": "player_anims"
     },
     "light_creator": {

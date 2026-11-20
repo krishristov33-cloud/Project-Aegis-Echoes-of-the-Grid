@@ -23,6 +23,9 @@ export function createLaunchpads({ bus, physics, scene, player, clock, cfg = {} 
   }
 
   const api = {
+    get cooldownLeft() {
+      return cooldownLeft;
+    },
     get ready() {
       return cooldownLeft <= 0;
     },

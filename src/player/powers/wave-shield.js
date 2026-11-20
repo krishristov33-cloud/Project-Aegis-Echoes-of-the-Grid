@@ -15,6 +15,9 @@ export function createWaveShield({ bus, physics, scene, player, clock, cfg = {},
   const active = [];
 
   const api = {
+    get cooldownLeft() {
+      return cooldownLeft;
+    },
     get ready() {
       return cooldownLeft <= 0;
     },

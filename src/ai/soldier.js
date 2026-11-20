@@ -7,6 +7,7 @@ import { Weapon } from './weapon.js';
 import { randRange, yawTo, angleDelta, flatDist } from './util.js';
 
 const _muzzle = new THREE.Vector3();
+const _aimTmp = new THREE.Vector3();
 
 export class Soldier extends Enemy {
   /**
@@ -49,6 +50,15 @@ export class Soldier extends Enemy {
     this._badCover = new Set(); // cover points with no view of the target; cleared when the target moves on
     this._blindPeeks = 0;
     this._peekSaw = false;
+    this.staggerT = 0; // hit reaction: no moving, no shooting
+    this.hitSeq = 0; // bumped on every hit; the view layer plays the reaction when it changes
+    this.lastHit = null; // { dir (world, away from the attacker), amount, heavy }
+    this.shove = null; // { t, struck } close-range rifle-butt shove (telegraphed)
+    this.shoveCd = 0;
+    this.shoveSeq = 0;
+    this.aimWorld = null; // where the gun points (view layer aims the torso and the rifle at it)
+    this.lookWorld = null; // where the head looks while suspicious
+    this.muzzleWorld = null; // set by the view layer from the rifle model; falls back to an estimate
     this._offs = [o.bus.on('noise', (e) => this._onNoise(e))];
   }
 
@@ -89,9 +99,10 @@ export class Soldier extends Enemy {
     this.now = now;
     this.target = player;
     if (this.dead) {
-      this._deathFall(dt);
+      this._deadUpdate(dt);
       return;
     }
+    const H = this.cfg.hit ?? {};
 
     // knockback: slide along the navmesh, then let the crowd take over again
     if (this.knockback.lengthSq() > 0.05) {
@@ -99,7 +110,7 @@ export class Soldier extends Enemy {
       const snapped = this.nav.closest(next, { x: 1, y: 2, z: 1 });
       if (snapped) this.agent.teleport(snapped);
       this.moveTarget = null;
-      this.knockback.multiplyScalar(Math.max(0, 1 - 6 * dt));
+      this.knockback.multiplyScalar(Math.max(0, 1 - (H.knockbackDecay ?? 6) * dt));
     }
 
     const ap = this.agent.position();
@@ -119,12 +130,25 @@ export class Soldier extends Enemy {
     per.update(dt, now, player);
     this.suppression = Math.max(0, this.suppression - this.cfg.suppressionDecay * dt);
     this.hitTimer -= dt;
+    this.staggerT -= dt;
+    this.shoveCd -= dt;
     this._report(dt, now);
+    this.lookWorld = per.state === 'suspicious' ? per.lastKnown : null;
 
-    if (this.ducked) {
+    if (this.ducked || this.staggerT > 0) {
+      // stunned / reeling: the punish window. No moving, no shooting, wind-ups are lost.
       this.state = 'ducked';
-      this.animState = 'ducked';
+      this.animState = this.staggerT > 0 ? 'stagger' : 'ducked';
+      this.shove = null;
+      this.aimWorld = null;
+      this.weapon.interrupt();
+      this.weapon.update(dt, { wantFire: false });
       this.stop();
+      this.syncView();
+      return;
+    }
+    if (this.shove) {
+      this._shoveTick(dt, player);
       this.syncView();
       return;
     }
@@ -146,30 +170,86 @@ export class Soldier extends Enemy {
 
     // weapon
     const aim = per.believedTarget ?? this.squad?.target;
-    _muzzle.copy(this.position).setY(this.position.y + (this.crouched ? 1.0 : 1.4));
-    _muzzle.x += Math.sin(this.yaw) * 0.4;
-    _muzzle.z += Math.cos(this.yaw) * 0.4;
-    const shot = this.weapon.update(dt, { wantFire: firing, aimPos: aim, target: player, atGhost: per.fooledByGhost, muzzle: _muzzle, suppression: this.suppression });
-    if (shot === 'reload') this.squad?.say(this, 'reloading');
+    if (this.muzzleWorld) _muzzle.copy(this.muzzleWorld);
+    else {
+      _muzzle.copy(this.position).setY(this.position.y + (this.crouched ? 1.0 : 1.4));
+      _muzzle.x += Math.sin(this.yaw) * 0.4;
+      _muzzle.z += Math.cos(this.yaw) * 0.4;
+    }
+    const wasReloading = this.weapon.reloading;
+    const shot = this.weapon.update(dt, {
+      wantFire: firing, aimPos: aim, target: player, atGhost: per.fooledByGhost, muzzle: _muzzle, suppression: this.suppression,
+      offscreen: firing && !!this.director?.offscreen?.(this.position),
+    });
+    if (shot === 'reload' || (!wasReloading && this.weapon.reloading)) {
+      this.reloadSeq = (this.reloadSeq ?? 0) + 1;
+      this.squad?.say(this, 'reloading');
+    }
+    // gun points at the aim point while winding up / firing, at the believed target otherwise in a fight
+    if (this.weapon.aiming) this.aimWorld = this.weapon.aimPoint;
+    else if (this.state === 'combat' && aim && !this.crouched) this.aimWorld = _aimTmp.copy(aim).setY(aim.y + 1.1);
+    else this.aimWorld = null;
 
     // facing: look where we move unless fighting from a spot
     const speed = Math.hypot(this.velocity.x, this.velocity.z);
-    if (this.state === 'combat' && (firing || this.combat === 'hide' || speed < 0.5)) this.faceTowards(aim, dt);
+    const shooting = this.weapon.phase === 'aim' || this.weapon.phase === 'burst';
+    if (this.state === 'combat' && (firing || shooting || this.combat === 'hide' || speed < 0.5)) this.faceTowards(aim, dt);
     else if (speed > 0.3) this._turn(Math.atan2(this.velocity.x, this.velocity.z), dt);
     else if (this._lookYaw !== null) this._turn(this._lookYaw, dt);
 
-    this.animState = this._anim(speed, firing);
+    this.animState = this._anim(speed);
     this.syncView();
   }
 
-  _anim(speed, firing) {
-    if (this.hitTimer > 0) return 'hit';
-    if (this.weapon.reloading) return this.crouched ? 'crouchReload' : 'reload';
-    if (firing) return this.crouched ? 'crouchFire' : 'fire';
+  _anim(speed) {
+    const w = this.weapon;
+    if (w.reloading) return this.crouched ? 'crouchReload' : 'reload';
+    if (w.phase === 'burst') return this.crouched ? 'crouchFire' : 'fire';
+    if (w.phase === 'aim') return this.crouched ? 'crouchAim' : speed > 0.3 ? 'aimWalk' : 'aim';
     if (speed > this.cfg.walkSpeed + 0.4) return 'run';
     if (speed > 0.3) return this.state === 'combat' ? 'aimWalk' : 'walk';
     if (this.crouched) return 'crouch';
     return this.state === 'combat' ? 'aim' : 'idle';
+  }
+
+  // ---------- close range: telegraphed rifle-butt shove ----------
+  _tryShove(player) {
+    const S = this.cfg.shove;
+    if (!S || this.shoveCd > 0 || player.hp <= 0) return false;
+    if (flatDist(this.position, player.position) > S.range || Math.abs(player.position.y - this.position.y) > 1.2) return false;
+    this.shove = { t: S.windup, struck: false, recover: S.recover };
+    this.shoveCd = randRange(S.cooldown);
+    this.shoveSeq++;
+    this.weapon.interrupt(S.windup + S.recover);
+    this.stop();
+    this.bus.emit('enemyTelegraph', { id: this.id, kind: 'melee', pos: this.position.clone(), time: S.windup });
+    return true;
+  }
+
+  _shoveTick(dt, player) {
+    const S = this.cfg.shove;
+    const sh = this.shove;
+    this.state = 'combat';
+    this.animState = 'shove';
+    this.aimWorld = null;
+    this.weapon.update(dt, { wantFire: false });
+    if (!sh.struck) {
+      this.faceTowards(player.position, dt * 0.6); // commits to a direction: sidestep / dodge works
+      sh.t -= dt;
+      if (sh.t <= 0) {
+        sh.struck = true;
+        const d = flatDist(this.position, player.position);
+        const off = Math.abs(angleDelta(this.yaw, yawTo(this.position, player.position)));
+        if (d <= S.range + S.reach && off <= (S.arcDeg * Math.PI) / 360 && Math.abs(player.position.y - this.position.y) < 1.2) {
+          const dealt = player.takeDamage?.(S.damage, this);
+          if (dealt) player.applyImpulse?.(new THREE.Vector3(Math.sin(this.yaw) * S.push, S.pushUp, Math.cos(this.yaw) * S.push));
+        }
+        this.bus.emit('noise', { pos: this.position.clone(), radius: 6, kind: 'enemyMelee' });
+      }
+    } else {
+      sh.recover -= dt;
+      if (sh.recover <= 0) this.shove = null;
+    }
   }
 
   _enter(state) {
@@ -264,6 +344,7 @@ export class Soldier extends Enemy {
     const per = this.perception;
     const threat = per.believedTarget ?? this.squad?.target;
     if (!threat) return false;
+    if (per.canSee && !per.fooledByGhost && this._tryShove(player)) return false;
     const cc = this.cfg.cover;
     this.timer -= dt;
     this._coverCheckT -= dt;
@@ -307,7 +388,17 @@ export class Soldier extends Enemy {
           this.cover.release(this.id);
           this.coverPoint = null;
           this.combat = 'advance';
-          this.timer = 2.5;
+          this.timer = randRange(cc.strafeEvery ?? [2.2, 3.8]);
+          // no cover to be had: don't stand there like a turret, shift a few steps between bursts
+          this._strafe = false;
+          for (let tries = 0; tries < 5 && !this._strafe; tries++) {
+            const sp = this.nav.randomPointAround(this.position, cc.strafeRadius ?? 4);
+            if (!sp || Math.abs(sp.y - this.position.y) > 1 || flatDist(sp, this.position) < 1.5) continue;
+            const dt2 = flatDist(sp, threat);
+            if (dt2 < (cc.strafeMinDist ?? 4.5) || dt2 > cc.preferredMax) continue;
+            this.moveTo(sp, false);
+            this._strafe = true;
+          }
         }
         return false;
       }
@@ -318,6 +409,26 @@ export class Soldier extends Enemy {
           this.stop();
           this.combat = 'hide';
           this.timer = randRange(cc.hideTime) * 0.5;
+          this._stuckT = 0;
+        } else {
+          // the crowd can wedge an agent short of its cover point: don't stand in the open forever
+          const sp = Math.hypot(this.velocity.x, this.velocity.z);
+          this._stuckT = sp < 0.25 ? (this._stuckT ?? 0) + dt : 0;
+          if (this._stuckT > (cc.stuckTime ?? 1.2)) {
+            this._stuckT = 0;
+            if (this.coverPoint && flatDist(this.position, this.coverPoint.pos) < 1.6) {
+              this.stop();
+              this.combat = 'hide';
+              this.timer = randRange(cc.hideTime) * 0.5;
+            } else {
+              if (this.coverPoint) this._badCover.add(this.coverPoint);
+              this.cover.release(this.id);
+              this.coverPoint = null;
+              this.stop();
+              this.combat = 'advance';
+              this.timer = 2.5;
+            }
+          }
         }
         return role.role === 'suppress' && seesTarget && flatDist(this.position, threat) < this.cfg.weapon.range * 0.6;
       }
@@ -360,8 +471,13 @@ export class Soldier extends Enemy {
       case 'advance': {
         // no cover available: push to a spot inside the preferred range and fight standing
         const d = flatDist(this.position, threat);
-        if (!seesTarget || d > cc.preferredMax) this.moveTo(threat, true);
-        else this.stop();
+        if (!seesTarget || d > cc.preferredMax) {
+          this.moveTo(threat, true);
+          this._strafe = false;
+        } else if (!this._strafe || this.arrived(0.5)) {
+          this.stop();
+          this._strafe = false;
+        }
         if (this.timer <= 0) this.combat = 'seekCover';
         return seesTarget && d < this.cfg.weapon.range;
       }
@@ -370,9 +486,28 @@ export class Soldier extends Enemy {
   }
 
   // ---------- reactions ----------
+  /** World direction the hit pushes us (away from the attacker), or our own backwards if unknown. */
+  _hitDir(src) {
+    const pos = this.sourcePosition(src);
+    const d = new THREE.Vector3();
+    if (pos) d.set(this.position.x - pos.x, 0, this.position.z - pos.z);
+    if (d.lengthSq() < 1e-4) d.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+    return d.normalize();
+  }
+
   onHurt(n, src) {
+    const H = this.cfg.hit ?? {};
+    const heavy = n >= (H.heavyDamage ?? 20) || src?.kind === 'blast';
+    const onBeat = !!src?.onBeat;
     this.hitTimer = 0.25;
+    this.staggerT = Math.max(this.staggerT, (heavy ? (H.staggerHeavy ?? 0.8) : (H.stagger ?? 0.45)) * (onBeat ? (H.onBeatMult ?? 1.4) : 1));
     this.suppression = Math.min(1, this.suppression + 0.35);
+    const dir = this._hitDir(src);
+    this.lastHit = { dir, amount: n, heavy, onBeat };
+    this.hitSeq++;
+    this.knockback.addScaledVector(dir, Math.min(H.knockbackMax ?? 6, n * (H.knockbackPerDamage ?? 0.14)));
+    this.weapon.interrupt(H.fireRestAfterHit ?? 0.8);
+    this.shove = null;
     const pos = this.sourcePosition(src);
     if (pos) {
       this.perception.share(pos, this.now, true);
@@ -384,17 +519,45 @@ export class Soldier extends Enemy {
     }
   }
 
+  /** Sub-Bass Blast: thrown back along the navmesh and floored for a moment. */
+  applyImpulse(v) {
+    if (this.dead) return;
+    super.applyImpulse(v);
+    const H = this.cfg.hit ?? {};
+    if (Math.hypot(v.x, v.z) >= (H.heavyImpulse ?? 5)) {
+      this.staggerT = Math.max(this.staggerT, H.staggerHeavy ?? 0.8);
+      this.weapon.interrupt(H.fireRestAfterHit ?? 0.8);
+    }
+  }
+
   onDucked() {
+    this.weapon.interrupt();
     if (Math.random() < 0.5) this.squad?.say(this, 'ducked');
   }
 
-  _deathFall(dt) {
-    if (!this.view || this._fallen) return;
+  /** Dead: the body keeps sliding from the killing blow; without a death clip it topples procedurally. */
+  _deadUpdate(dt) {
+    if (this.knockback.lengthSq() > 0.02) {
+      const next = this.position.clone().addScaledVector(this.knockback, dt);
+      const snapped = this.nav.closest(next, { x: 1, y: 2, z: 1 });
+      if (snapped) this.position.set(snapped.x, this.position.y, snapped.z);
+      this.knockback.multiplyScalar(Math.max(0, 1 - 5 * dt));
+      this.syncView();
+    }
+    if (!this.view || this._fallen || this.view.userData.deathClip) return;
     this.view.rotation.x = Math.max(this.view.rotation.x - dt * 3, -Math.PI / 2);
     if (this.view.rotation.x <= -Math.PI / 2 + 1e-3) this._fallen = true;
   }
 
-  onDeath() {
+  onDeath(src) {
+    const H = this.cfg.hit ?? {};
+    const dir = this._hitDir(src);
+    this.lastHit = { dir, amount: this.hpMax, heavy: true, onBeat: !!src?.onBeat, fatal: true };
+    this.hitSeq++;
+    this.knockback.setY(0).addScaledVector(dir, H.deathKnockback ?? 3);
+    this.aimWorld = null;
+    this.shove = null;
+    this.weapon.interrupt();
     this.cover.release(this.id);
     this.nav.removeAgent(this.agent);
     this.squad?.onMemberDied(this);

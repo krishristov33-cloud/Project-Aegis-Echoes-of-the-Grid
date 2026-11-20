@@ -16,14 +16,19 @@ Playable vertical-slice skeleton: third-person controller, locomotion, foot IK, 
 
 | Input | Action |
 |---|---|
-| WASD | Move (camera-relative). Full stick = run |
+| WASD | Move (camera-relative) |
 | Shift | Sprint |
-| Ctrl / C | Walk |
-| Space | Jump, or vault if a waist-high crate/ledge is in front |
+| Ctrl / X | Walk |
+| Space | Jump (hold for height), or vault a waist-high crate / ledge in front |
+| C / RMB / Left Alt | Dodge with i-frames (longer on the beat); backward hop with no direction held |
 | Mouse (click to lock) | Look |
-| LMB / J | Melee combo |
+| LMB / J | Melee chain: cross, hook, roundhouse. Snaps to the nearest target in front |
 | F / K | Sub-Bass Blast |
+| Q / R / G / T | Blink / Phase-Skip / Wave-Shield / Launchpad |
+| Esc | Pause |
 | 1–4 (`?debug=1`) | Rooftop / Cradle / chamber / arena |
+
+URL flags: `?debug=1` debug panel + level keys, `?nopost=1` plain render, `?noreflect=1` no planar reflections, `?noai=1` no enemies, `?shots=1` headless test mode.
 
 ## How to run / test
 
@@ -32,6 +37,7 @@ cd /path/to/Aegis-Echoes-of-the-Grid
 python3 -m http.server 8080
 # open http://127.0.0.1:8080/index.html
 # headless: python3 tests/test_l1_l4.py  (server on 8765, ?shots=1)
+# on a machine with a GPU and Chrome: AEGIS_CHROME=1 AEGIS_GPU=1 python tests/test_l1_l4.py
 ```
 
 Headless result (Playwright + Chromium swiftshader): **no console/page errors**, Xbot loaded, bone map bound (`mixamorigHips` etc.), scripted **idle → sprint (7.5 m/s) → jump → vault** (landed past the crate at z≈8.1). Melee state entered. Screenshots:

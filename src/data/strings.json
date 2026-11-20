@@ -71,15 +71,15 @@
     "waveIncoming": [
       "Drone inbound! More on the roof!",
       "They've called backup!",
-      "Second wave \u2014 watch the sky!"
+      "Second wave — watch the sky!"
     ]
   },
   "title": "Project Aegis: Echoes of the Grid",
   "subtitle": "Echoes of the Grid",
-  "prompt": "Click to start \u00b7 WASD move \u00b7 Shift sprint \u00b7 Space jump / vault \u00b7 Left click melee \u00b7 F Sub-Bass Blast",
-  "loading": "AEGIS \u00b7 LOADING",
+  "prompt": "Click to start · WASD move · Shift sprint · Space jump / vault · Left click melee · F Sub-Bass Blast",
+  "loading": "AEGIS · LOADING",
   "hud": {
-    "hp": "HP",
+    "hp": "MIX INTEGRITY",
     "bpm": "BPM",
     "enterPrefix": "NOW ENTERING",
     "levels": {
@@ -95,6 +95,157 @@
     },
     "boss": "DISSONANT HULK",
     "weak": "WEAK",
-    "arenaDrop": "ARENA  \u00b7  drop in"
+    "arenaDrop": "ARENA  ·  drop in",
+    "onBeat": "ON BEAT",
+    "combo": "CHAIN",
+    "streak": "IN TIME ×{n}",
+    "walkIn": "{label}  ·  walk in",
+    "objectiveLabel": "OBJECTIVE",
+    "warning": "INCOMING",
+    "powers": {
+      "blast": "BLAST",
+      "blink": "BLINK",
+      "phaseSkip": "PHASE",
+      "waveShield": "SHIELD",
+      "launchpad": "PAD"
+    },
+    "keys": {
+      "blast": "F",
+      "blink": "Q",
+      "phaseSkip": "R",
+      "waveShield": "G",
+      "launchpad": "T"
+    },
+    "objectives": {
+      "rooftop": "Clear the Directorate squad off the roof",
+      "rooftopWave": "Hostiles remaining: {n}",
+      "rooftopBackup": "Backup inbound. Hold the roof",
+      "rooftopClear": "Roof clear. Drop through the gate",
+      "cradle": "Cross the Cradle to the World Engine",
+      "cradleHostiles": "Hostiles in the Cradle: {n}",
+      "chamber": "Touch the core and repeat its phrase on the pads",
+      "chamberListen": "Listen to the phrase",
+      "chamberPlay": "Step on the pads in the order the core played them. On the beat heals you",
+      "chamberSolved": "Engine in tune. Take the gate to the arena",
+      "arena": "Bring down the Dissonant Hulk",
+      "arenaWeak": "It opens when you hit on the beat. Strike the weak point",
+      "arenaDone": "The grid is in tune"
+    }
+  },
+  "menu": {
+    "tagline": "The city runs at 174 beats per minute. Hit in time and it hits with you.",
+    "start": "START",
+    "resume": "RESUME",
+    "restart": "RESTART AREA",
+    "controls": "CONTROLS",
+    "back": "BACK",
+    "quality": "POST FX",
+    "sound": "SOUND",
+    "on": "ON",
+    "off": "OFF",
+    "paused": "PAUSED",
+    "pausedSub": "SIGNAL HELD",
+    "dead": "SIGNAL LOST",
+    "deadSub": "Resyncing to the last checkpoint",
+    "victory": "GRID IN TUNE",
+    "victorySub": "The Dissonant Hulk is silent",
+    "playAgain": "PLAY AGAIN",
+    "stats": {
+      "time": "TIME",
+      "kills": "HOSTILES DOWN",
+      "onBeat": "ON-BEAT HITS",
+      "deaths": "SIGNAL LOSSES",
+      "best": "BEST CHAIN"
+    },
+    "creditsTitle": "CREDITS",
+    "credits": [
+      [
+        "Direction, music",
+        "Kris"
+      ],
+      [
+        "Core gameplay",
+        "Lumen"
+      ],
+      [
+        "Systems, AI, audio",
+        "Claude"
+      ],
+      [
+        "Animation, VFX",
+        "Aether"
+      ],
+      [
+        "Design, world",
+        "Krea"
+      ]
+    ],
+    "controlsList": [
+      [
+        "WASD",
+        "Move"
+      ],
+      [
+        "Shift",
+        "Sprint"
+      ],
+      [
+        "Ctrl",
+        "Walk"
+      ],
+      [
+        "Space",
+        "Jump / vault"
+      ],
+      [
+        "C / RMB",
+        "Dodge"
+      ],
+      [
+        "Mouse",
+        "Look"
+      ],
+      [
+        "LMB / J",
+        "Melee chain"
+      ],
+      [
+        "F",
+        "Sub-Bass Blast"
+      ],
+      [
+        "Q",
+        "Frame-Drop Blink"
+      ],
+      [
+        "R",
+        "Phase-Skip"
+      ],
+      [
+        "G",
+        "Wave-Shield"
+      ],
+      [
+        "T",
+        "Resonant Launchpad"
+      ],
+      [
+        "Esc",
+        "Pause"
+      ]
+    ]
+  },
+  "tips": {
+    "move": "{WASD} to move. The mouse looks around",
+    "sprint": "Hold {Shift} to sprint",
+    "jump": "{Space} jumps. Run at a crate and it vaults",
+    "melee": "{LMB} strikes. Press again to chain three hits",
+    "dodge": "{C} or {RMB} dodges. Time it and the shots pass through you",
+    "onBeat": "Hit as the ring closes: on-beat hits deal 1.5× and stun",
+    "blast": "{F} Sub-Bass Blast throws back everything in front of you",
+    "blink": "{Q} Blink away and leave a ghost for them to shoot",
+    "phaseSkip": "{R} Phase-Skip dashes through bullets and thin walls",
+    "waveShield": "{G} raises a Wave-Shield out of the floor",
+    "launchpad": "{T} drops a Launchpad. Step on it to fly"
   }
 }

@@ -1,4 +1,29 @@
 {
-  "note": "Krea owns acoustic puzzle design (K1). C4 reads this from chamber.js.",
-  "chambers": []
+  "note": "Acoustic puzzle design (K1). Read by src/world/acoustic-puzzle.js; schema is documented at the top of that file. Pads sit on ring radii (m) at an angle in degrees (0 = +Z, toward the exit gate). sustain / answerBeats are in beats of the level BPM.",
+  "chambers": [
+    {
+      "level": "chamber",
+      "ringRadii": [5.6],
+      "padRadius": 1.0,
+      "startRadius": 1.45,
+      "pads": [
+        { "id": "A", "ring": 0, "angle": 0, "note": "A3" },
+        { "id": "C", "ring": 0, "angle": 60, "note": "C4" },
+        { "id": "D", "ring": 0, "angle": 120, "note": "D4" },
+        { "id": "E", "ring": 0, "angle": 180, "note": "E4" },
+        { "id": "G", "ring": 0, "angle": 240, "note": "G4" },
+        { "id": "H", "ring": 0, "angle": 300, "note": "A4" }
+      ],
+      "stages": [
+        { "type": "echo", "sequence": ["A", "D", "G"] },
+        { "type": "echo", "sequence": ["C", "A", "E", "D"] },
+        { "type": "chord", "notes": ["A", "E", "G"], "sustain": 24 }
+      ],
+      "failDamage": 4,
+      "answerBeats": 24,
+      "listenGapBeats": 2,
+      "requireOnBeat": false,
+      "perfectHeal": 3
+    }
+  ]
 }

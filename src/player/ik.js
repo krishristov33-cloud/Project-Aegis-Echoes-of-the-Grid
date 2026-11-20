@@ -8,6 +8,8 @@ import { critDamp } from './animTuning.js';
 
 const _qa = new THREE.Quaternion();
 const _qb = new THREE.Quaternion();
+const _qc = new THREE.Quaternion();
+const _ax = new THREE.Vector3();
 
 /** Bind canonical bones on a root, using a manifest/auto boneMap if provided. */
 export function collectBones(root, boneMap) {
@@ -55,10 +57,9 @@ export function applyFootIK(root, bones, physics, ikT, weight = 1, dt = 1 / 60) 
   if (weight <= 0.01 || !bones.hips || !physics) return;
   root.updateMatrixWorld(true);
   const hips = bones.hips;
-  if (!hips._ikRest) hips._ikRest = hips.position.clone();
-  hips.position.copy(hips._ikRest);
+  // the mixer has just written the animated pelvis position; offsets are added on top of it
   const hipOff = ikT.hipOffsetY || 0;
-  hips.position.y += hipOff;
+  hips.position.y += hipOff / (ikT.hipUnit || 1);
 
   const sides = [
     { up: bones.leftUpperLeg, mid: bones.leftLowerLeg, foot: bones.leftFoot, sign: 1 },
@@ -104,7 +105,7 @@ export function applyFootIK(root, bones, physics, ikT, weight = 1, dt = 1 / 60) 
   }
   const hipDrop = critDamp(st.hip, hipDropTgt, ikT.hipOmega ?? 18, dt);
   if (Math.abs(hipDrop) > 0.0005) {
-    hips.position.y -= hipDrop;
+    hips.position.y -= hipDrop / (ikT.hipUnit || 1);
     hips.updateMatrixWorld(true);
     root.updateMatrixWorld(true);
   }
@@ -122,5 +123,18 @@ export function applyFootIK(root, bones, physics, ikT, weight = 1, dt = 1 / 60) 
     const fp = r.s.foot.getWorldPosition(new THREE.Vector3());
     const target = r.target.clone(); target.x = fp.x; target.z = fp.z;
     twoBoneIK(r.s.up, r.s.mid, r.s.foot, target, pole, r.plant);
+    // pitch / roll the planted foot onto the surface it stands on
+    const n = r.hit.normal;
+    const align = (ikT.footAlign ?? 0) * r.plant;
+    if (align > 0.01 && n && n.y > 0.5 && n.y < 0.9995) {
+      const maxA = (ikT.footAlignMaxDeg ?? 30) * Math.PI / 180;
+      const ang = Math.min(maxA, Math.acos(Math.min(1, n.y))) * align;
+      const axis = _ax.set(n.z, 0, -n.x).normalize(); // up x normal
+      _qa.setFromAxisAngle(axis, ang);
+      r.s.foot.parent.updateWorldMatrix(true, false);
+      const pw = r.s.foot.parent.getWorldQuaternion(_qb);
+      const fw = _qc.copy(pw).multiply(r.s.foot.quaternion);
+      r.s.foot.quaternion.copy(pw.invert().multiply(_qa.multiply(fw)));
+    }
   }
 }

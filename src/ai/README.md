@@ -52,3 +52,12 @@ Enemies take `takeDamage(n, {source:'player'})` (the hit is traced back to the p
 ## Test pages
 - `tests/ai.html`: sandbox arena, stub player, debug views (navmesh, cover, sight cones). `window.__test` for console poking.
 - `tests/ai-game.html?debug=1`: the real game, unmodified `main.js`, with encounters attached from outside and a test rooftop squad (used until `enemies.json` has an `encounters` block).
+
+## Enemy feel pass (W3)
+
+- `weapon.js`: aim wind-up -> burst -> pause -> short re-aim. The gun drags an aim point after the target at a limited speed and only hits when the muzzle -> aim-point line passes within `hitRadius` of the chest, so moving sideways, jumping or dodging beats it and standing still does not. Attack tokens (`squad.maxShooters`) cap how many enemies shoot at once. Emits `enemyTelegraph {id, kind:'aim'|'burst', pos, time, target}`.
+- `soldier.js`: stagger + directional knockback on every hit (`soldier.hit`), a telegraphed rifle-butt shove at melee range (`soldier.shove`, telegraph kind `'melee'`), strafing when there is no reachable cover, stuck recovery.
+- `drone.js`: beat-telegraphed dive (`drone.dive`): wind-up (`enemyTelegraph kind 'dive'`), line locked on the commit beat (`enemyAttack {id, kind:'dive', from, to, time}`), recovery window low over the ground with `vulnerableMult` damage. Banking, pitch and hover bob in `syncView`.
+- `hulk.js`: animation cues fitted to the beat wind-up (`cue`), `enemyTelegraph kind 'slam'|'throw'|'well'`, `bossDefeated` now fires `deathTime` seconds after the kill (end of the death sequence).
+- `enemy-anim.js`: per-enemy animator (lower/upper body split, speed-matched locomotion, torso aim, head look, flinch spring, hit flash). `encounters.js` is the view layer: arm IK onto the rifle so the barrel really points at the aim point, death collapse + corpse sink-out. `enemy-fx.js`: aim lasers, tracers, muzzle flashes, dive line (4 instanced draw calls). `skin-fix.js`: repairs hand/hip weight bleed in auto-rigged meshes and finds a rifle modelled into the hand.
+- All numbers: `src/data/enemies.json` (`soldier.weapon`, `soldier.hit`, `soldier.shove`, `soldier.cover.strafe*`, `drone.dive`, `drone.visual`, `anim`, `fx`, `hulk.anim`, `hulk.deathTime`).
