@@ -64,6 +64,9 @@ export function createPhaseSkip({ bus, physics, player, clock, cfg = {} }) {
     get active() {
       return !!dash;
     },
+    get cooldownLeft() {
+      return cooldownLeft;
+    },
     get ready() {
       return cooldownLeft <= 0 && !dash && player.hp > 0;
     },

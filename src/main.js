@@ -20,6 +20,8 @@ import { createBlink } from './player/powers/blink.js';
 import { createPowers } from './player/powers/powers.js';
 import { createMixHealth } from './audio/mixhealth.js';
 import { createSidechain } from './audio/sidechain.js';
+import { createPost } from './fx/post.js';
+import { createSfx } from './audio/sfx.js';
 
 const QS = new URLSearchParams(location.search);
 const DEBUG = QS.has('debug') || QS.has('shots');
@@ -31,9 +33,10 @@ async function loadJSON(url) {
   return r.json();
 }
 
-function resize(renderer, camera) {
+function resize(renderer, camera, post) {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
+  post?.resize?.(w, h);
   camera.aspect = w / Math.max(1, h);
   camera.updateProjectionMatrix();
 }
@@ -59,8 +62,9 @@ async function boot() {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(tuning.camera?.fov ?? 60, 1, 0.1, 200);
-  resize(renderer, camera);
-  addEventListener('resize', () => resize(renderer, camera));
+  const post = createPost({ renderer, scene, camera, tuning, bus });
+  resize(renderer, camera, post);
+  addEventListener('resize', () => resize(renderer, camera, post));
 
   await initAssets(renderer);
 
@@ -78,6 +82,7 @@ async function boot() {
   const clock = createAudioClock(bus, tuning);
   createMixHealth(bus);
   createSidechain(bus);
+  const sfx = createSfx({ bus, clock, tuning });
 
   const hud = createHud({ root: document.getElementById('hud'), strings, bus, debug: DEBUG });
   const tempo = createTempoWidget({ root: document.getElementById('hud'), bus, strings });
@@ -181,7 +186,24 @@ async function boot() {
     strings,
     manifest,
     enemies,
+    post,
+    sfx,
+    orbit,
+    paused: false,
+    /** Freeze the sim for `sec` real seconds (hit-stop). Longest request wins. */
+    hitstop(sec) { hitstopUntil = Math.max(hitstopUntil, performance.now() / 1000 + sec); },
+    /** Seconds left on each power, for the HUD: { blink, phaseSkip, waveShield, launchpad, blast } each {left, total}. */
+    cooldowns() {
+      return {
+        blast: { left: player.combat.blastCd, total: tuning.combat?.blastCooldown ?? 2.5 },
+        blink: { left: blink.cooldownLeft ?? 0, total: powers.blink?.cooldown ?? 2.8 },
+        phaseSkip: { left: c3.phaseSkip.cooldownLeft ?? 0, total: powers.phaseSkip?.cooldown ?? 3.2 },
+        waveShield: { left: c3.waveShield.cooldownLeft ?? 0, total: powers.waveShield?.cooldown ?? 8 },
+        launchpad: { left: c3.launchpad.cooldownLeft ?? 0, total: powers.launchpad?.cooldown ?? 3 },
+      };
+    },
   };
+  let hitstopUntil = 0;
   window.game = game;
   const fx = initFX(game);
   window.AG = {
@@ -255,7 +277,14 @@ async function boot() {
   let portalLock = 0;
   function tick() {
     requestAnimationFrame(tick);
+    time.scale = performance.now() / 1000 < hitstopUntil ? 0.04 : (game.timeScale ?? 1);
     const dt = time.tick();
+    if (game.paused) {
+      // menus own the screen: keep drawing the frozen frame, drop gameplay input
+      post.render(0);
+      endFrame();
+      return;
+    }
     clock.update(dt);
 
     if (DEBUG && keyJust('Digit1')) goto('rooftop');
@@ -290,7 +319,8 @@ async function boot() {
       }
     }
 
-    renderer.render(scene, camera);
+    sfx.update?.(dt);
+    post.render(dt);
 
     hud.update({
       state: player.state,
