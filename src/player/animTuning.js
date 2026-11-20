@@ -65,6 +65,13 @@ export const animTuning = {
     stopSettlePitch: -6,
     stopSettleHip: 0.045,
 
+    // Turn-in-place shuffle: some of the walk cycle is mixed in while the body yaws at a standstill.
+    turnStepMaxSpeed: 0.6, // m/s; above this the normal gait takes over
+    turnStepFrom: 1.2,     // rad/s of yaw before the feet start stepping
+    turnStepRange: 4,      // rad/s over which it reaches full weight
+    turnStepWeight: 0.45,
+    turnStepCadence: 0.28, // walk cycles per radian turned
+
     minCadence: 0.75,      // slowest step rate (cycles of the walk clip per clip-length) while creeping
     guardLambda: 5,        // idle <-> combat-ready stance
     fallDelay: 0.06,       // seconds airborne before the fall loop takes over (walking off a ledge)

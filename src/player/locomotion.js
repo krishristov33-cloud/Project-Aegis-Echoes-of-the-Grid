@@ -302,6 +302,16 @@ export class Locomotion {
       }
     } else if (this.loco[0]) w[0] = 1;
 
+    // Turning on the spot: shuffle the feet round instead of pivoting on locked soles.
+    const turn = this.grounded && v < L.turnStepMaxSpeed ? clamp((Math.abs(this.yawVel) - L.turnStepFrom) / L.turnStepRange, 0, 1) : 0;
+    if (turn > 0 && moving.length) {
+      const i0 = this.loco.findIndex((l) => l.name === 'idle');
+      const i1 = this.loco.indexOf(moving[0]);
+      const add = Math.max(0, turn * L.turnStepWeight - w[i1]);
+      if (add > 0) { w[i1] += add; if (i0 >= 0) w[i0] = Math.max(0, w[i0] - add); }
+      rate = Math.max(rate, (Math.abs(this.yawVel) * L.turnStepCadence) / moving[0].clip.duration);
+    }
+
     const blendLam = L.blendLambda;
     this.loco.forEach((l, i) => { l.w = damp(l.w, w[i], blendLam, dt); });
     this._guardW = damp(this._guardW, this.combatIdle, L.guardLambda, dt);

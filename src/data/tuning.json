@@ -40,7 +40,9 @@
     "respawnIframe": 1.5,
     "voidDamage": 15,
     "checkpointClear": 12,
-    "threatRange": 11
+    "threatRange": 11,
+    "regenDelay": 5,
+    "regenRate": 9
   },
   "camera": {
     "distance": 4.5,

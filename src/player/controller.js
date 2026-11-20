@@ -71,6 +71,8 @@ export function createPlayer(ctx) {
     _dead: false,
     _iframe: 0,
     _dashT: 0,
+    _sinceHurt: 0,
+    _regenT: 0,
     applyImpulse(v) {
       this._impulse.add(v);
     },
@@ -92,6 +94,7 @@ export function createPlayer(ctx) {
   // Power gestures: the powers move the body, the animation layer shows the effort.
   const P = tuning.powerAnim || {};
   const offs = [
+    bus.on('playerDamaged', () => { player._sinceHurt = 0; }),
     bus.on('blink', () => { if (player.hp > 0) loco.play('blinkIn', { fade: 0.02, fadeOut: 0.22 }); }),
     bus.on('phaseSkip', () => {
       if (player.hp <= 0) return;
@@ -453,7 +456,10 @@ export function createPlayer(ctx) {
 
     const wasGrounded = player.isGrounded;
     const vyBefore = player.velocity.y;
+    const px = object.position.x, pz = object.position.z;
     const res = integrate(dt);
+    // what the body actually covered (walls and corners eat speed); the legs follow this, not the stick
+    const moved = dt > 1e-5 ? Math.hypot(object.position.x - px, object.position.z - pz) / dt : 0;
     player.isGrounded = res.grounded;
 
     if (res.grounded) {
@@ -503,10 +509,23 @@ export function createPlayer(ctx) {
       if (player._dodge) player._dodge.dist *= 0.5;
     }
 
+    // ---- out-of-combat recovery: the mix cleans itself up when nothing has hit Kael for a while ----
+    if (player.hp < player.hpMax) {
+      player._sinceHurt += dt;
+      if (player._sinceHurt > (T.regenDelay ?? 5)) {
+        player.hp = Math.min(player.hpMax, player.hp + (T.regenRate ?? 9) * dt);
+        player._regenT -= dt;
+        if (player._regenT <= 0 || player.hp >= player.hpMax) {
+          player._regenT = 0.4;
+          bus.emit('playerHealed', { amount: 0, hp: player.hp, hpMax: player.hpMax, regen: true });
+        }
+      }
+    }
+
     // ---- facing, look-at, stance ----
     if (faceYaw !== null && faceYaw !== undefined) player.yaw = faceYaw;
     const spd = Math.hypot(player.velocity.x, player.velocity.z);
-    const animSpd = player._dodge || player._roll || combat.locked ? 0 : (player.isGrounded ? spd : Math.max(spd, 0.5));
+    const animSpd = player._dodge || player._roll || combat.locked ? 0 : (player.isGrounded ? Math.min(spd, moved * 1.1 + 0.4) : Math.max(spd, 0.5));
     loco.setMove(animSpd, player.yaw);
     if (carry) { loco._spd.p = spd; loco._spd.v = 0; loco.speed = spd; }
     loco.setVertical(player.velocity.y, player.isGrounded);
