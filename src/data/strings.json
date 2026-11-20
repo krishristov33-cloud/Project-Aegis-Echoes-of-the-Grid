@@ -198,6 +198,10 @@
         "Jump / vault"
       ],
       [
+        "C / RMB",
+        "Dodge"
+      ],
+      [
         "Mouse",
         "Look"
       ],
@@ -236,6 +240,7 @@
     "sprint": "Hold {Shift} to sprint",
     "jump": "{Space} jumps. Run at a crate and it vaults",
     "melee": "{LMB} strikes. Press again to chain three hits",
+    "dodge": "{C} or {RMB} dodges. Time it and the shots pass through you",
     "onBeat": "Hit as the ring closes: on-beat hits deal 1.5× and stun",
     "blast": "{F} Sub-Bass Blast throws back everything in front of you",
     "blink": "{Q} Blink away and leave a ghost for them to shoot",

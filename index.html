@@ -176,7 +176,9 @@ kbd{display:inline-block;min-width:20px;text-align:center;background:var(--txt);
 .panel h2{margin:0 0 34px;font:700 54px/1 var(--f);letter-spacing:.3em;text-indent:.3em;color:#fff;text-shadow:0 0 28px #3df0ff66;white-space:nowrap}
 .panel .p-list{display:grid;grid-template-columns:auto auto;gap:9px 22px;justify-content:center;text-align:left;font:500 13px/1.5 var(--f);color:var(--txt);margin-bottom:28px}
 .panel .p-list span:nth-child(odd){text-align:right}
-#death{background:radial-gradient(ellipse at center,rgba(40,0,14,.55),rgba(3,2,6,.92));pointer-events:none}
+#death{background:radial-gradient(ellipse at center,rgba(40,0,14,.55),rgba(3,2,6,.92));pointer-events:none;animation:deathIn 1.5s ease-out both}
+@keyframes deathIn{0%,38%{opacity:0}100%{opacity:1}}
+#death .p-bar i{animation-delay:.4s!important}
 #death h2{color:var(--mag);margin-bottom:16px;text-shadow:3px 0 0 #3df0ff66,-3px 0 0 #ff3d8a,0 0 30px #ff3d8a88;animation:glitch 1.4s steps(2) infinite}
 #death .p-sub{font:500 13px var(--f);letter-spacing:.24em;color:var(--dim)}
 #death .p-bar{width:260px;height:2px;margin:22px auto 0;background:#ffffff18;overflow:hidden}

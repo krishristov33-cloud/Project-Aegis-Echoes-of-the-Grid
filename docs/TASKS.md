@@ -61,8 +61,26 @@ bus.emit('enemyKilled', {id, kind, pos})                 // death anim, resonanc
 bus.emit('phaseSkip', {from, to})                        // C3 → A2 phase-skip streak
 bus.emit('waveShield', {origin, dir, duration})          // C3 → A2 wave-shield VFX
 bus.emit('launchpad', {origin, burst?})                  // C3 → A2 launchpad pulse / burst
+// added with the vertical-slice pass:
+bus.emit('impact', {pos, strength, kind, onBeat, id?, release?, from?}) // kind: melee|blast|kill|hurt|land. One event for all
+                                                         // hit feel: main.js hit-stop + camera shake, post pulse, sfx
+bus.emit('playerAction', {name, index?, onBeat?, strength?}) // jump|land|vault|dodge|swing|blastCharge|death|respawn (sfx, tips)
+bus.emit('playerDied', {pos})                            // death screen; player respawns at the last safe-ground checkpoint
+bus.emit('playerRespawned', {pos, fall?})
+bus.emit('comboChanged', {count, onBeatStreak})          // landed-hit streak for the HUD
+bus.emit('enemyTelegraph', {id, kind, pos, time})        // src/ai, just before a dangerous attack (HUD warning, sfx)
+bus.emit('objective', {level, key, text})                // encounter-flow → HUD objective line
+bus.emit('puzzleState', {level, stage, stages, phase, progress, length, type}) // chamber: waiting|listen|answer|chord|solved
+bus.emit('puzzleNote', {level, pad, note, by, ok, onBeat, index})
+bus.emit('puzzleFail', {level, stage, reason})           // wrongPad|offBeat|tooSlow
+bus.emit('puzzleSolved', {level})                        // unlocks the chamber → arena gate
+// levelState also fires {level, phase:'clear'} when a level's gate unlocks
 ```
 Note on the labels above: they predate the final owner split. Current owners: `beat` is L6, `sidechain` comes from L4/L7 and `src/ai/director.js` ducks enemies on it, `noise` is consumed by C1 hearing, `blink` is emitted by L8 and C1 makes enemies shoot the ghost, `callout` is emitted by C1 squads for L5.
 Player API exposed on `game.player`: `position, velocity, isGrounded, hp, state, applyImpulse(v), takeDamage(n, src)`.
+`player._iframe > 0` (dodge, respawn, phase-skip) means untouchable: `takeDamage` returns 0. `player.state` also reports `dodge`, `roll`, `skid`, `vault`, `dead`.
+
+## Animation
+Humanoid clips come from two places: the donor rig's own loops (idle / walk / run) and the procedural library in `src/anim/clips.js`, authored as keyframed poses on canonical channels (`src/anim/pose-rig.js`) and baked onto the donor role flagged `procClips` in the manifest. Both are retargeted to every role with `animSource`, so a new rig only needs a bone map. Add a clip by adding a definition to `CLIP_DEFS`; its name is its logical name.
 Enemy API: `id, position, hp, state, duck(sec), takeDamage(n, src)`.
 On-beat rule: an action is on-beat if `|phase| < 0.12` or `> 0.88`; damage ×1.5 and a shockwave.

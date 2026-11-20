@@ -220,6 +220,8 @@ async function boot() {
   };
   let hitstopUntil = 0;
   window.game = game;
+  if (post.setEnabled === undefined) post.setEnabled = (on) => { post.enabled = !!on; };
+  if (post.enabled !== false) document.getElementById('vign')?.remove(); // the post stack has its own vignette
 
   // One event drives all the hit feel: freeze frames, camera shake and kick (sfx, vfx and post listen too).
   const HS = tuning.combat?.hitstop || {};
@@ -323,6 +325,9 @@ async function boot() {
     if (DEBUG && keyJust('Digit3')) goto('chamber');
     if (DEBUG && keyJust('Digit4')) goto('arena');
 
+    // behind the title the world idles: no enemy AI, a slow orbit around Kael
+    const onTitle = hud.screens?.mode === 'title';
+    if (onTitle) orbit.yaw += dt * (tuning.camera?.titleOrbit ?? 0.07);
     pawn.update(dt, orbit.yaw, orbit.pitch);
     orbit.setSpeed(Math.hypot(player.velocity.x, player.velocity.z));
     orbit.update(dt, player.position, physics);
@@ -334,8 +339,7 @@ async function boot() {
     blink.update(dt);
     c3.update(dt);
     current?.update?.(dt, player.position, bus);
-    flow.update(dt, current);
-    encounters.update(dt);
+    if (!onTitle) { flow.update(dt, current); encounters.update(dt); }
     fx.update(dt);
 
     if (portalLock > 0) portalLock -= dt;

@@ -24,6 +24,7 @@ export function createTips({ root, strings, bus, enabled = true }) {
     { id: 'sprint', when: () => true },
     { id: 'jump', when: () => true },
     { id: 'melee', when: () => enemyNear(14) },
+    { id: 'dodge', when: () => did.shotAt || did.hurt },
     { id: 'onBeat', when: () => did.melee && enemyNear(16) },
     { id: 'blast', when: () => enemyNear(10) && cd('blast') <= 0 },
     { id: 'blink', when: () => did.hurt && cd('blink') <= 0 },
@@ -46,6 +47,7 @@ export function createTips({ root, strings, bus, enabled = true }) {
   on('sidechain', (p = {}) => { if (p.source === 'blast') did.blast = true; });
   on('playerDamaged', () => { did.hurt = true; });
   on('enemyShot', () => { did.shotAt = true; });
+  on('playerAction', (p = {}) => { if (p.name === 'dodge') did.dodge = true; });
   on('blink', () => { did.blink = true; });
   on('phaseSkip', () => { did.phaseSkip = true; });
   on('waveShield', () => { did.waveShield = true; });

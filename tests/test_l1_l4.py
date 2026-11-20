@@ -8,7 +8,8 @@ from playwright.async_api import async_playwright
 ROOT = Path(__file__).resolve().parents[1]
 SHOTS = ROOT / "shots"
 SHOTS.mkdir(exist_ok=True)
-URL = "http://127.0.0.1:8765/index.html?shots=1&debug=1"
+# noreflect/nopost keep the software-GL run fast; noai keeps soldiers from interrupting the movement checks
+URL = "http://127.0.0.1:8765/index.html?shots=1&debug=1&noai=1&noreflect=1" + ("" if os.environ.get("AEGIS_GPU") else "&nopost=1")
 
 
 def ensure_server(port=8765):
@@ -27,10 +28,9 @@ async def main():
     ensure_server()
     async with async_playwright() as p:
         # AEGIS_CHROME=1 uses the installed Chrome instead of Playwright's bundled Chromium
-        browser = await p.chromium.launch(channel="chrome" if os.environ.get("AEGIS_CHROME") else None, args=[
-            "--use-gl=angle", "--use-angle=swiftshader",
-            "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
-        ])
+        # AEGIS_GPU=1 renders on the real GPU (D3D11) instead of swiftshader
+        gl = ["--use-angle=d3d11", "--enable-gpu"] if os.environ.get("AEGIS_GPU") else ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
+        browser = await p.chromium.launch(channel="chrome" if os.environ.get("AEGIS_CHROME") else None, args=gl + ["--ignore-gpu-blocklist"])
         page = await browser.new_page(viewport={"width": 1280, "height": 720})
         page.on("pageerror", lambda e: errs.append("PAGEERROR: " + str(e)))
         def on_console(m):
@@ -103,13 +103,22 @@ async def main():
         print("AFTER_VAULT", json.dumps(after))
         await page.screenshot(path=str(SHOTS / "03_vault.png"))
 
-        await page.evaluate("() => { AG.tp(3.2, 3.6); AG.face(0); AG.attack(); }")
-        await page.wait_for_timeout(400)
-        melee = await page.evaluate("() => AG.state()")
-        print("MELEE", json.dumps(melee))
-        await page.evaluate("() => AG.blast()")
-        await page.wait_for_timeout(400)
-        print("BLAST", await page.evaluate("() => AG.state()"))
+        # combat + dodge: sample the state every frame in the page so slow frames cannot hide a state
+        seen = await page.evaluate("""async () => {
+          const seen = new Set();
+          const watch = (ms) => new Promise((res) => { const t0 = performance.now(); (function f() { seen.add(AG.player.state); if (performance.now() - t0 < ms) requestAnimationFrame(f); else res(); })(); });
+          AG.tp(3.2, 3.6); AG.face(0); AG.clearInput();
+          await watch(300);
+          AG.attack(); await watch(200); AG.attack(); await watch(250); AG.attack(); await watch(900);
+          AG.blast(); await watch(900);
+          AG.dodge(); await watch(700);
+          AG.setInput({forward:1}); await watch(300); AG.dodge(); await watch(700); AG.clearInput();
+          return [...seen];
+        }""")
+        print("STATES", json.dumps(seen))
+        missing = [s for s in ("melee1", "melee2", "melee3", "blast", "dodge") if s not in seen]
+        clips = await page.evaluate("() => ['jump','fall','land','landRoll','vault','melee1','melee2','melee3','blast','hit','death','dodge','dodgeBack','castGround','castThrow','blinkIn','dash','guard'].filter((n) => !AG.player.loco.hasClip(n))")
+        print("MISSING_CLIPS", json.dumps(clips))
 
         print("ERRORS", len(errs))
         for e in errs[:25]:
@@ -127,6 +136,15 @@ async def main():
             print("WARN jump may not have left the ground:", midair)
         if fatal:
             print("FAIL console/page errors")
+            return 1
+        if missing:
+            print("FAIL combat states never seen:", missing)
+            return 1
+        if clips:
+            print("FAIL animation clips missing:", clips)
+            return 1
+        if after["pos"][2] < 7.4:
+            print("FAIL vault did not clear the crate:", after["pos"])
             return 1
         print("OK")
         return 0
