@@ -64,6 +64,23 @@ export const animTuning = {
     stopSettleDur: 0.22,
     stopSettlePitch: -6,
     stopSettleHip: 0.045,
+
+    minCadence: 0.75,      // slowest step rate (cycles of the walk clip per clip-length) while creeping
+    guardLambda: 5,        // idle <-> combat-ready stance
+    fallDelay: 0.06,       // seconds airborne before the fall loop takes over (walking off a ledge)
+    fallFade: 0.2,
+
+    breathRate: 0.28,      // Hz
+    breathHip: 0.004,      // metres
+    breathChest: 1.3,      // degrees
+    sprintLean: 7,         // extra forward lean at full sprint, degrees
+    sprintLambda: 5,
+
+    // Head / chest look-at (camera aim, or the nearest threat)
+    lookMaxYaw: 62,
+    lookMaxPitch: 28,
+    lookOmega: 9,
+    lookLambda: 6,
   },
 
   ik: {
@@ -76,6 +93,9 @@ export const animTuning = {
     hipOmega: 18,          // smoothed pelvis drop
     plantOmega: 20,        // plant / unplant blend (kills edge jitter)
     targetYOmega: 22,      // foot target height smoothing
+    busyRelease: 0.85,     // how much authored full-body clips switch the foot IK off
+    footAlign: 0.7,        // how far a planted foot pitches / rolls onto the slope
+    footAlignMaxDeg: 30,
   },
 
   jump: {
@@ -90,8 +110,8 @@ export const animTuning = {
     airTuckPitch: 10,
     airPoseOmega: 12,
     // Landing compression scales with impact speed, then springs back.
-    landGain: 0.035,       // meters per (m/s) of downward impact
-    landMax: 0.14,
+    landGain: 0.014,       // meters per (m/s) of downward impact (on top of the land clip)
+    landMax: 0.09,
     landOmega: 11,
   },
 };

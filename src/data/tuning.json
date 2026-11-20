@@ -6,8 +6,8 @@
     "jogSpeed": 2.8,
     "runSpeed": 5.0,
     "sprintSpeed": 7.5,
-    "accel": 14,
-    "decel": 16,
+    "accel": 26,
+    "decel": 30,
     "airAccel": 5,
     "jumpSpeed": 6.8,
     "gravity": 22,
@@ -20,13 +20,32 @@
     "coyoteTime": 0.12,
     "jumpBuffer": 0.12,
     "hpMax": 100,
-    "turnRateDeg": 720,
-    "airControl": 0.45
+    "turnRateDeg": 900,
+    "airControl": 0.45,
+    "sprintTurnRateDeg": 400,
+    "skidSpeed": 4.2,
+    "skidAngleDeg": 130,
+    "skidTime": 0.16,
+    "skidDecel": 36,
+    "attackFriction": 14,
+    "jumpCutMult": 0.5,
+    "terminalSpeed": 40,
+    "softLandSpeed": 4,
+    "hardLandSpeed": 12.5,
+    "hardLandLock": 0.32,
+    "rollMinSpeed": 2.2,
+    "rollDuration": 0.62,
+    "rollSpeed": 5.2,
+    "respawnDelay": 2.4,
+    "respawnIframe": 1.5,
+    "voidDamage": 15,
+    "checkpointClear": 12,
+    "threatRange": 11
   },
   "camera": {
-    "distance": 5.8,
-    "height": 1.45,
-    "shoulder": 0.4,
+    "distance": 4.5,
+    "height": 1.42,
+    "shoulder": 0.46,
     "minDistance": 1.6,
     "pitchMin": -0.4,
     "pitchMax": 1.15,
@@ -34,7 +53,24 @@
     "fov": 60,
     "collisionPad": 0.22,
     "pullLambda": 14,
-    "returnLambda": 6
+    "returnLambda": 6,
+    "followLambda": 22,
+    "followLambdaY": 9,
+    "maxLagY": 1.1,
+    "snapDistance": 9,
+    "speedFrom": 5.2,
+    "speedTo": 7.5,
+    "speedFov": 7,
+    "speedDistance": 0.5,
+    "speedLambda": 3.5,
+    "traumaDecay": 1.9,
+    "shakeAngle": 0.035,
+    "shakeOffset": 0.07,
+    "kickLambda": 11,
+    "impactTrauma": 0.42,
+    "hurtTrauma": 0.5,
+    "landTrauma": 0.35,
+    "impactKick": 0.012
   },
   "loco": {
     "clipSpeeds": {
@@ -72,21 +108,51 @@
       0.62
     ],
     "meleeCancel": [
-      0.2,
-      0.22,
-      0.36
+      0.24,
+      0.26,
+      0.46
     ],
     "blastRange": 8,
     "blastAngleDeg": 55,
     "blastDamage": 28,
     "blastKnockback": 14,
     "blastCooldown": 2.5,
-    "hitStun": 0.4,
+    "hitStun": 0.32,
     "onBeatWindow": 0.12,
     "onBeatMult": 1.5,
     "sidechainStrengthMelee": 0.6,
     "sidechainStrengthBlast": 1,
-    "duckWindow": 0.35
+    "duckWindow": 0.35,
+    "meleeHitTime": [
+      0.12,
+      0.13,
+      0.26
+    ],
+    "meleeStep": [
+      0.5,
+      0.45,
+      0.7
+    ],
+    "lockRange": 4.2,
+    "lockAngleDeg": 150,
+    "meleeReach": 0.85,
+    "lungeMax": 2.6,
+    "inputBuffer": 0.22,
+    "heavyHit": 18,
+    "hurtIframe": 0.25,
+    "hurtKnockback": 3.5,
+    "comboWindow": 2.4,
+    "finisherKnockback": 7,
+    "blastHitTime": 0.16,
+    "blastDuration": 0.62,
+    "blastCancel": 0.4,
+    "blastRecoil": 2.2,
+    "hitstop": {
+      "base": 0.035,
+      "perStrength": 0.07,
+      "kill": 0.05,
+      "onBeat": 0.02
+    }
   },
   "audio": {
     "bpm": 174,
@@ -110,6 +176,87 @@
       "thump": 0.7
     }
   },
+  "post": {
+    "msaa": 4,
+    "bloom": {
+      "strength": 0.55,
+      "radius": 0.62,
+      "threshold": 0.92
+    },
+    "chroma": 0.0006,
+    "grain": 0.035,
+    "vignette": 0.42,
+    "vignetteSoft": 0.55,
+    "saturation": 1.08,
+    "contrast": 1.06,
+    "beatBloom": 0.06,
+    "impactChroma": 0.006,
+    "hurtChroma": 0.008,
+    "hurtVignette": 0.35,
+    "pulseDecay": 5.5,
+    "levels": {
+      "rooftop": {
+        "tint": [
+          0.97,
+          1.0,
+          1.04
+        ],
+        "lift": [
+          0.0,
+          0.012,
+          0.03
+        ],
+        "saturation": 1.12,
+        "bloom": 0.6
+      },
+      "cradle": {
+        "tint": [
+          0.96,
+          1.0,
+          1.05
+        ],
+        "lift": [
+          0.0,
+          0.02,
+          0.04
+        ],
+        "saturation": 1.05,
+        "bloom": 0.5,
+        "vignette": 0.36
+      },
+      "chamber": {
+        "tint": [
+          0.98,
+          1.0,
+          1.03
+        ],
+        "lift": [
+          0.01,
+          0.0,
+          0.03
+        ],
+        "saturation": 1.12,
+        "bloom": 0.48,
+        "vignette": 0.5
+      },
+      "arena": {
+        "tint": [
+          1.05,
+          0.97,
+          0.98
+        ],
+        "lift": [
+          0.03,
+          0.0,
+          0.01
+        ],
+        "saturation": 1.1,
+        "contrast": 1.1,
+        "bloom": 0.65,
+        "vignette": 0.5
+      }
+    }
+  },
   "rain": {
     "count": 1100,
     "area": 42,
@@ -120,5 +267,31 @@
   "levels": {
     "voidY": -24,
     "respawnDelay": 0.6
+  },
+  "dodge": {
+    "distance": 4.4,
+    "duration": 0.4,
+    "iframe": 0.3,
+    "onBeatIframeMult": 1.45,
+    "cooldown": 0.3,
+    "buffer": 0.15,
+    "backScale": 0.7
+  },
+  "powerAnim": {
+    "phaseSkipHold": 0.34,
+    "shieldLock": 0.42,
+    "padLock": 0.26
+  },
+  "characterLight": {
+    "rimColor": "#a8ecff",
+    "rimIntensity": 26,
+    "rimDistance": 7,
+    "rimBack": 2.2,
+    "rimUp": 2.4,
+    "rimSide": 1.1,
+    "fillColor": "#ffe6d0",
+    "fillIntensity": 9,
+    "fillDistance": 9,
+    "fillUp": 0.6
   }
 }

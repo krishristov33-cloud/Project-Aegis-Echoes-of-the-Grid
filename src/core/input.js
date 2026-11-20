@@ -8,7 +8,7 @@ export const input = {
   mouseDy: 0,
   locked: false,
   enabled: true,
-  _script: { forward: 0, right: 0, sprint: false, walk: false, jump: false, melee: false, blast: false, blink: false, phaseSkip: false, waveShield: false, launchpad: false },
+  _script: { forward: 0, right: 0, sprint: false, walk: false, jump: false, dodge: false, melee: false, blast: false, blink: false, phaseSkip: false, waveShield: false, launchpad: false },
   _scripting: false,
 };
 
@@ -16,7 +16,7 @@ export function bindInput(canvas, { onLock, onUnlock } = {}) {
   const onKey = (e, down) => {
     if (e.repeat) return;
     if (down) { DOWN.add(e.code); JUST.add(e.code); } else { DOWN.delete(e.code); UP.add(e.code); }
-    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'AltLeft', 'Tab'].includes(e.code)) e.preventDefault();
   };
   window.addEventListener('keydown', (e) => onKey(e, true));
   window.addEventListener('keyup', (e) => onKey(e, false));
@@ -50,6 +50,7 @@ export function endFrame() {
   input.mouseDx = 0; input.mouseDy = 0;
   if (input._scripting) {
     input._script.jump = false;
+    input._script.dodge = false;
     input._script.melee = false;
     input._script.blast = false;
     input._script.blink = false;
@@ -66,7 +67,7 @@ export function setScriptedInput(partial = {}) {
 
 export function clearScriptedInput() {
   input._scripting = false;
-  input._script = { forward: 0, right: 0, sprint: false, walk: false, jump: false, melee: false, blast: false, blink: false, phaseSkip: false, waveShield: false, launchpad: false };
+  input._script = { forward: 0, right: 0, sprint: false, walk: false, jump: false, dodge: false, melee: false, blast: false, blink: false, phaseSkip: false, waveShield: false, launchpad: false };
 }
 
 export function moveAxis() {
@@ -82,8 +83,11 @@ export function moveAxis() {
 }
 
 export function wantsSprint() { return input._scripting ? !!input._script.sprint : (keyDown('ShiftLeft') || keyDown('ShiftRight')); }
-export function wantsWalk() { return input._scripting ? !!input._script.walk : (keyDown('ControlLeft') || keyDown('KeyC') || keyDown('CapsLock')); }
+export function wantsWalk() { return input._scripting ? !!input._script.walk : (keyDown('ControlLeft') || keyDown('KeyX')); }
 export function wantsJump() { return input._scripting ? !!input._script.jump : (keyJust('Space')); }
+/** Space still held (variable jump height). Scripted jumps always count as held. */
+export function jumpHeld() { return input._scripting ? input._script.jumpHold !== false : keyDown('Space'); }
+export function wantsDodge() { return input._scripting ? !!input._script.dodge : (keyJust('KeyC') || keyJust('AltLeft') || keyJust('Mouse2')); }
 export function wantsMelee() { return input._scripting ? !!input._script.melee : (keyJust('Mouse0') || keyJust('KeyJ')); }
 export function wantsBlast() { return input._scripting ? !!input._script.blast : (keyJust('KeyF') || keyJust('KeyK')); }
 export function wantsBlink() { return input._scripting ? !!input._script.blink : keyJust('KeyQ'); }

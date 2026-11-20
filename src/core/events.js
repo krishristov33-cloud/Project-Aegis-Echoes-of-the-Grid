@@ -22,6 +22,17 @@ export const Events = Object.freeze({
   enemyShot: 'enemyShot',
   enemyHit: 'enemyHit',
   enemyKilled: 'enemyKilled',
+  enemyTelegraph: 'enemyTelegraph',
+  impact: 'impact',
+  playerAction: 'playerAction',
+  playerDied: 'playerDied',
+  playerRespawned: 'playerRespawned',
+  comboChanged: 'comboChanged',
+  objective: 'objective',
+  puzzleState: 'puzzleState',
+  puzzleNote: 'puzzleNote',
+  puzzleFail: 'puzzleFail',
+  puzzleSolved: 'puzzleSolved',
 });
 
 class Bus {

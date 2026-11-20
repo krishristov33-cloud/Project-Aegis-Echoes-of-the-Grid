@@ -5,10 +5,13 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { resolveBoneMap, bindBones } from './bones.js';
 import { retargetClips, retargetRole, MESHY24_BONE_MAP } from './retarget.js';
+import { PoseRig, bakeClip } from '../anim/pose-rig.js';
+import { CLIP_DEFS } from '../anim/clips.js';
 
 const loader = new GLTFLoader();
 const cache = new Map();
 const roleCache = new Map();
+const bakeCache = new Map(); // role -> { clips, animations, clipMap } (clips bind by bone name, so clones share them)
 let ktx2Loader = null;
 let assetsReady = null;
 
@@ -158,11 +161,25 @@ export async function loadRole(role, manifest) {
     const clips = Object.fromEntries(rawClips.map((c) => [c.name, c]));
     const loaded = { role, entry, root: scene, gltf: { scene, animations: rawClips }, clips, clipMap, boneMap, bones, fallback: false, height, radius };
 
+    if (entry.procClips) addProceduralClips(loaded);
+
     if (entry.animSource && entry.animSource !== role) {
-      const srcKey = `anim:${entry.animSource}`;
-      if (!roleCache.has(srcKey)) roleCache.set(srcKey, loadRole(entry.animSource, manifest));
-      const source = await roleCache.get(srcKey);
-      retargetRole(loaded, source, { inPlace: true });
+      const baked = bakeCache.get(role);
+      if (baked) {
+        loaded.clips = baked.clips;
+        loaded.gltf.animations = baked.animations;
+        loaded.clipMap = baked.clipMap;
+      } else {
+        const srcKey = `anim:${entry.animSource}`;
+        if (!roleCache.has(srcKey)) roleCache.set(srcKey, loadRole(entry.animSource, manifest));
+        const source = await roleCache.get(srcKey);
+        retargetRole(loaded, source, { inPlace: true });
+        for (const c of loaded.gltf.animations) {
+          const src = source.clips?.[c.name];
+          if (src?.userData && !c.userData?.procedural) c.userData = src.userData;
+        }
+        bakeCache.set(role, { clips: loaded.clips, animations: loaded.gltf.animations, clipMap: loaded.clipMap });
+      }
       clipMap = loaded.clipMap || clipMap;
     }
     return loaded;
@@ -172,6 +189,24 @@ export async function loadRole(role, manifest) {
   }
 }
 
+
+/** Bake the procedural clip library (src/anim/clips.js) onto a loaded humanoid; logical name = clip name. */
+function addProceduralClips(loaded) {
+  try {
+    const rig = new PoseRig(loaded.root, loaded.boneMap);
+    if (!rig.ok) return;
+    const map = { ...(loaded.clipMap || {}) };
+    for (const def of CLIP_DEFS) {
+      const clip = bakeClip(rig, def);
+      loaded.clips[clip.name] = clip;
+      loaded.gltf.animations.push(clip);
+      if (!map[clip.name]) map[clip.name] = clip.name;
+    }
+    loaded.clipMap = map;
+  } catch (err) {
+    console.warn('[assets] procedural clips failed', err);
+  }
+}
 
 /**
  * Load a prop from manifest.props (falls back to manifest.roles).

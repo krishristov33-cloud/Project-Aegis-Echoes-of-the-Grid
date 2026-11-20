@@ -68,7 +68,7 @@ async function boot() {
 
   await initAssets(renderer);
 
-  const PROP_NAMES = ['hvac_neon', 'speaker_stack', 'panel_block', 'crate', 'resonance_ring', 'monolith', 'gate_arch'];
+  const PROP_NAMES = ['hvac_neon', 'speaker_stack', 'panel_block', 'crate', 'resonance_ring', 'monolith', 'gate_arch', 'crystals', 'altar'];
   const props = {};
   await Promise.all(PROP_NAMES.map(async (n) => {
     try { props[n] = await loadProp(n, manifest); }
@@ -113,9 +113,24 @@ async function boot() {
 
   const orbit = new ThirdPersonCamera(camera, tuning);
 
+  // Character lights: a cool rim from beyond the player and a soft fill from the camera, so the hero and
+  // anything close to him read against the dark levels. Short range, no shadows.
+  const CL = tuning.characterLight || {};
+  const rimLight = new THREE.PointLight(new THREE.Color(CL.rimColor ?? '#a8ecff'), CL.rimIntensity ?? 26, CL.rimDistance ?? 7, 2);
+  const fillLight = new THREE.PointLight(new THREE.Color(CL.fillColor ?? '#ffe6d0'), CL.fillIntensity ?? 9, CL.fillDistance ?? 9, 2);
+  scene.add(rimLight, fillLight);
+  const _camFwd = new THREE.Vector3();
+  function placeCharacterLights() {
+    camera.getWorldDirection(_camFwd).setY(0).normalize();
+    rimLight.position.copy(player.position).addScaledVector(_camFwd, CL.rimBack ?? 2.2);
+    rimLight.position.x += -_camFwd.z * (CL.rimSide ?? 1.1); rimLight.position.z += _camFwd.x * (CL.rimSide ?? 1.1);
+    rimLight.position.y += CL.rimUp ?? 2.4;
+    fillLight.position.copy(camera.position); fillLight.position.y += CL.fillUp ?? 0.6;
+  }
+
   const encounters = createEncounters({
     bus, scene, physics, player, enemies, manifest,
-    data: { enemies: enemiesData, strings },
+    data: { enemies: QS.has('noai') ? { ...enemiesData, encounters: {} } : enemiesData, strings },
   });
 
   const flow = createEncounterFlow({ bus, scene, player, enemies, strings });
@@ -205,6 +220,19 @@ async function boot() {
   };
   let hitstopUntil = 0;
   window.game = game;
+
+  // One event drives all the hit feel: freeze frames, camera shake and kick (sfx, vfx and post listen too).
+  const HS = tuning.combat?.hitstop || {};
+  const CT = tuning.camera || {};
+  bus.on('impact', (e) => {
+    const s = Math.max(0, Math.min(1, e?.strength ?? 0.3));
+    if (e.kind === 'land') { orbit.addTrauma(s * (CT.landTrauma ?? 0.35)); orbit.kick(-s * 0.02); return; }
+    if (e.kind === 'hurt') { orbit.addTrauma(0.2 + s * (CT.hurtTrauma ?? 0.5)); game.hitstop(0.03 + s * 0.04); return; }
+    orbit.addTrauma(s * (CT.impactTrauma ?? 0.42));
+    orbit.kick((CT.impactKick ?? 0.012) * (0.5 + s));
+    if (e.release) return; // the blast release shakes; only landed hits freeze
+    game.hitstop((HS.base ?? 0.035) + s * (HS.perStrength ?? 0.07) + (e.kind === 'kill' ? (HS.kill ?? 0.05) : 0) + (e.onBeat ? (HS.onBeat ?? 0.02) : 0));
+  });
   const fx = initFX(game);
   window.AG = {
     version: '0.1.0',
@@ -252,8 +280,11 @@ async function boot() {
     setInput: setScriptedInput,
     clearInput: clearScriptedInput,
     jump() { pawn.jump(); },
+    dodge() { pawn.dodge(); },
     tryVault() { return pawn.tryVault(orbit.yaw); },
+    pose(name, t) { return pawn.loco.debugPose(name, t); },
     attack() { player.combat.requestMelee(); },
+    pawn,
     blast() { player.combat.requestBlast(); },
     blinkNow() { return blink.trigger(orbit.yaw); },
     damage(n) { player.takeDamage(n ?? 10, 'debug'); },
@@ -292,8 +323,10 @@ async function boot() {
     if (DEBUG && keyJust('Digit3')) goto('chamber');
     if (DEBUG && keyJust('Digit4')) goto('arena');
 
-    pawn.update(dt, orbit.yaw);
+    pawn.update(dt, orbit.yaw, orbit.pitch);
+    orbit.setSpeed(Math.hypot(player.velocity.x, player.velocity.z));
     orbit.update(dt, player.position, physics);
+    placeCharacterLights();
     if (wantsBlink()) blink.trigger(orbit.yaw);
     if (wantsPhaseSkip()) c3.phaseSkip.trigger(orbit.yaw);
     if (wantsWaveShield()) c3.waveShield.trigger(orbit.yaw);
@@ -311,7 +344,7 @@ async function boot() {
         if (p.locked) continue;
         const d = player.position.distanceTo(p.pos);
         if (d < (p.radius ?? 1.6) + 0.4) {
-          hud.setPrompt(`${p.label || p.to}  ·  walk in`);
+          hud.setPrompt(`${p.label || p.to}  ·  ${strings.hud?.walkIn || 'walk in'}`);
           if (d < p.radius) { portalLock = 1.0; goto(p.to); hud.setPrompt(''); break; }
         } else {
           hud.setPrompt('');
