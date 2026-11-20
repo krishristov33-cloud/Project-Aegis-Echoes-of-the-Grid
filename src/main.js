@@ -192,6 +192,7 @@ async function boot() {
     clock,
     input,
     get level() { return current?.name; },
+    get current() { return current; },
     get ai() { return encounters.ai; },
     encounters,
     blink,
