@@ -23,6 +23,7 @@ export const Events = Object.freeze({
   enemyHit: 'enemyHit',
   enemyKilled: 'enemyKilled',
   enemyTelegraph: 'enemyTelegraph',
+  enemyAttack: 'enemyAttack',
   impact: 'impact',
   playerAction: 'playerAction',
   playerDied: 'playerDied',

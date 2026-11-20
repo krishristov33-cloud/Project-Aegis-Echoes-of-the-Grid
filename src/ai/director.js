@@ -13,7 +13,9 @@
 // Also adds/removes Wave-Shield meshes (`shieldRaised` / `shieldLowered`) to the line-of-sight occluders (C3).
 import { createNav } from './nav.js';
 import { CoverSystem } from './cover.js';
+import * as THREE from 'three';
 import { Squad } from './squad.js';
+import { createTokens } from './weapon.js';
 import { Soldier } from './soldier.js';
 import { Drone } from './drone.js';
 import { levelFromPhysics, PhysicsLineOfSight } from './level-geometry.js';
@@ -28,6 +30,9 @@ export async function createAI({ bus, player = null, physics, data }) {
 
   const enemies = [];
   const squads = [];
+  const tokens = createTokens(E.squad.maxShooters ?? 2);
+  const _camDir = new THREE.Vector3();
+  const _toP = new THREE.Vector3();
   let now = 0;
 
   const offs = [
@@ -60,7 +65,7 @@ export async function createAI({ bus, player = null, physics, data }) {
     },
 
     createSquad(name) {
-      const s = new Squad({ bus, cfg: E.squad, strings: data.strings.callouts ?? {}, nav, name });
+      const s = new Squad({ bus, cfg: E.squad, strings: data.strings.callouts ?? {}, nav, name, tokens });
       squads.push(s);
       return s;
     },
@@ -68,6 +73,7 @@ export async function createAI({ bus, player = null, physics, data }) {
     spawnSoldier({ position, patrol, squad, view, yaw }) {
       const s = new Soldier({ bus, nav, cover, los, cfg: E.soldier, ghostCfg: E.ghost, position, patrol, view, yaw });
       (squad ?? this.createSquad(`solo-${s.id}`)).add(s);
+      s.director = this;
       enemies.push(s);
       return s;
     },
@@ -75,6 +81,7 @@ export async function createAI({ bus, player = null, physics, data }) {
     spawnDrone({ position, patrol, squad, view }) {
       const d = new Drone({ bus, nav, los, cfg: E.drone, ghostCfg: E.ghost, position, patrol, view });
       (squad ?? this.createSquad(`solo-${d.id}`)).add(d);
+      d.director = this;
       enemies.push(d);
       return d;
     },
@@ -83,6 +90,19 @@ export async function createAI({ bus, player = null, physics, data }) {
     register(enemy) {
       enemies.push(enemy);
       return enemy;
+    },
+
+    tokens,
+
+    /** True when `pos` is outside the player's view (camera from game.camera). Off-screen shooters wind up longer. */
+    offscreen(pos) {
+      const cam = this.camera ?? globalThis.game?.camera;
+      if (!cam) return false;
+      cam.getWorldDirection(_camDir);
+      _toP.subVectors(pos, cam.position);
+      const d = _toP.length();
+      if (d < 1e-3) return false;
+      return _toP.dot(_camDir) / d < (E.squad.offscreenCos ?? 0.45);
     },
 
     byId(id) {

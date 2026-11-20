@@ -37,6 +37,9 @@ export const HULK_DEFAULTS = {
   well: { radius: 13, pull: 5.5, coreRadius: 2.6, coreDamage: 8, beats: 8, cooldownBeats: 16 },
   void: { damage: 5, crackBeats: 2 },
   debrisLife: 8,
+  deathTime: 2.6, // seconds of death sequence before bossDefeated
+  // clip fractions where the blow lands / the chunk leaves the hand (clips are time-fitted to the beat wind-up)
+  anim: { slamAt: 0.6, throwAt: 0.55, staggerTime: 0.8 },
 };
 
 const merge = (a, b) => {
@@ -80,6 +83,18 @@ export class Hulk extends Enemy {
     this._buildWeakPoints();
     this._offs = [o.bus.on('beat', (b) => this._onBeat(b))];
     this.target = null;
+    // animation cues for the view layer (encounters.js): { name, seq, duration, hold }
+    this.cue = { name: null, seq: 0 };
+    this.hitSeq = 0;
+    this.lastHit = null;
+    this._deathT = 0;
+    this._defeatSent = false;
+    this._weakStaggered = false;
+  }
+
+  /** Ask the view layer for a one-shot clip fitted into `duration` seconds. */
+  _cue(name, duration, hold = false) {
+    this.cue = { name, seq: this.cue.seq + 1, duration, hold };
   }
 
   get weakOpen() {
@@ -190,7 +205,13 @@ export class Hulk extends Enemy {
     const radius = kind === 'stomp' ? c.stomp.range : kind === 'well' ? c.well.radius : c.throw.radius;
     this.attack = { kind, beatsLeft: c.windupBeats, target, telegraph: this._ring(target, radius, kind === 'well' ? 0x9c4dff : 0xff3d8a, c.windupBeats * this._beatDur()) };
     this.state = 'windup';
+    const wind = c.windupBeats * this._beatDur();
+    // fit the clip so the blow / release lands exactly on the execute beat
+    if (kind === 'stomp') this._cue('hulkSlam', wind / c.anim.slamAt);
+    else if (kind === 'throw') this._cue('hulkThrow', wind / c.anim.throwAt);
+    else this._cue('hulkRoar', wind * 1.25);
     this.bus.emit('bossTelegraph', { id: this.id, kind, pos: target.clone(), radius, beats: c.windupBeats });
+    this.bus.emit('enemyTelegraph', { id: this.id, kind: kind === 'stomp' ? 'slam' : kind, pos: target.clone(), time: wind, radius });
   }
 
   _throwableTile() {
@@ -209,8 +230,8 @@ export class Hulk extends Enemy {
       this._ring(this.position, c.stomp.range, 0xffffff, 0.35);
       this.bus.emit('noise', { pos: this.position.clone(), radius: 25, kind: 'stomp' });
       if (pl && pl.hp > 0 && pl.isGrounded !== false && flatDist(pl.position, this.position) <= c.stomp.range) {
-        pl.takeDamage?.(c.stomp.damage, this);
-        pl.applyImpulse?.(new THREE.Vector3(0, c.stomp.knockUp, 0));
+        // a dodge (i-frames) takes no damage and is not thrown
+        if (pl.takeDamage?.(c.stomp.damage, this)) pl.applyImpulse?.(new THREE.Vector3(0, c.stomp.knockUp, 0));
       }
       if (this.phase >= 2) this._crackAround(this.position, c.stomp.crackRadius);
     } else if (a.kind === 'throw') {
@@ -314,7 +335,13 @@ export class Hulk extends Enemy {
       this.debris.splice(i, 1);
     }
     if (this.dead) {
-      if (this.view) this.view.rotation.x = Math.max(this.view.rotation.x - dt * 1.2, -Math.PI / 2);
+      // death sequence: collapse (clip, or a slow topple without one), then the boss is officially defeated
+      if (this.view && !this.view.userData.deathClip) this.view.rotation.x = Math.max(this.view.rotation.x - dt * 1.2, -Math.PI / 2);
+      this._deathT += dt;
+      if (!this._defeatSent && this._deathT >= c.deathTime) {
+        this._defeatSent = true;
+        this.bus.emit('bossDefeated', { id: this.id, pos: this.position.clone() });
+      }
       return;
     }
     if (!player) return;
@@ -331,6 +358,7 @@ export class Hulk extends Enemy {
       if (d < c.aggroRange) {
         this.state = 'roar';
         this.roarBeats = 2;
+        this._cue('hulkRoar', 2 * this._beatDur() + 0.2);
         this.bus.emit('bossPhase', { id: this.id, phase: this.phase });
       }
       this.syncView();
@@ -382,6 +410,8 @@ export class Hulk extends Enemy {
     // only an on-beat duck opens the weak points; it also staggers the Hulk and cancels its wind-up
     if (onBeat) {
       this.weakOpenUntil = this.now + this.cfg.weakOpenTime;
+      this._weakStaggered = false;
+      this._cue('hulkStagger', Math.min(this.cfg.weakOpenTime, this.cfg.anim.staggerTime * 1.6));
       if (this.attack) {
         this.attack.telegraph?.removeFromParent();
         this.attack = null;
@@ -398,6 +428,8 @@ export class Hulk extends Enemy {
     const dealt = n * (weak ? this.cfg.weakMult : this.cfg.armor);
     this.hp = Math.max(0, this.hp - dealt);
     this.bus.emit('enemyHit', { id: this.id, kind: this.kind, amount: dealt, hp: this.hp, hpMax: this.hpMax, pos: this.position.clone(), src, weak });
+    this.lastHit = { amount: dealt, weak, onBeat: !!src?.onBeat, fatal: this.hp <= 0 };
+    this.hitSeq++;
     if (this.state === 'idle') this.state = 'chase';
     if (this.hp <= 0) {
       this.dead = true;
@@ -406,9 +438,21 @@ export class Hulk extends Enemy {
       this.attack?.telegraph?.removeFromParent();
       this.attack = null;
       this._endWell();
+      for (const p of this.projectiles) {
+        p.marker?.removeFromParent();
+        p.mesh.removeFromParent();
+      }
+      this.projectiles.length = 0;
+      this._cue('death', null, true);
+      for (const w of this.weakPoints) w.visible = false;
       this.bus.emit('enemyKilled', { id: this.id, kind: this.kind, pos: this.position.clone() });
-      this.bus.emit('bossDefeated', { id: this.id, pos: this.position.clone() });
+      // bossDefeated follows after the death sequence (update -> deathTime)
       return dealt;
+    }
+    // the first blow into an open weak point rocks it
+    if (weak && !this._weakStaggered) {
+      this._weakStaggered = true;
+      this._cue('hulkStagger', this.cfg.anim.staggerTime);
     }
     const ratio = this.hp / this.hpMax;
     const next = ratio <= this.cfg.phaseAt[1] ? 3 : ratio <= this.cfg.phaseAt[0] ? 2 : 1;
@@ -416,6 +460,7 @@ export class Hulk extends Enemy {
       this.phase = next;
       this.state = 'roar';
       this.roarBeats = this.cfg.roarBeats;
+      this._cue('hulkRoar', this.cfg.roarBeats * this._beatDur());
       this.weakOpenUntil = -Infinity;
       this.attack?.telegraph?.removeFromParent();
       this.attack = null;

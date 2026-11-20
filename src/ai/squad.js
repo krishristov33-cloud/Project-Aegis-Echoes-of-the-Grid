@@ -12,7 +12,8 @@ export class Squad {
    * @param {object} o.nav       for search points
    * @param {string} [o.name]
    */
-  constructor({ bus, cfg, strings, nav, name = 'squad' }) {
+  constructor({ bus, cfg, strings, nav, name = 'squad', tokens = null }) {
+    this.tokens = tokens; // attack tokens shared by every squad in the level (weapon.js)
     this.bus = bus;
     this.cfg = cfg;
     this.strings = strings;
@@ -83,6 +84,7 @@ export class Squad {
     const witness = this.alive.find((m) => m !== member && m.position.distanceTo(member.position) < 25);
     if (witness) this.say(witness, member.kind === 'drone' ? 'droneDown' : 'manDown', true);
     this.roles.delete(member.id);
+    this.tokens?.release(member);
     this._roleT = 0;
   }
 

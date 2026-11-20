@@ -1,7 +1,7 @@
 {
   "_note": "Placeholder tuning written by Claude for C1/C2 so the systems run. Krea owns these values; change freely, code reads every number from here.",
   "soldier": {
-    "hp": 100,
+    "hp": 70,
     "radius": 0.4,
     "height": 1.8,
     "walkSpeed": 1.6,
@@ -27,25 +27,37 @@
       "forgetAfter": 10
     },
     "weapon": {
-      "damage": 3,
+      "damage": 7,
       "rof": 7,
       "burst": [
         3,
-        6
+        5
       ],
       "burstPause": [
-        0.7,
-        1.5
+        1.1,
+        1.9
       ],
       "range": 35,
-      "accuracyNear": 0.35,
-      "accuracyFar": 0.08,
-      "movingTargetPenalty": 0.5,
+      "accuracyNear": 0.8,
+      "accuracyFar": 0.4,
+      "movingTargetPenalty": 0.3,
       "suppressedPenalty": 0.5,
       "magazine": 30,
       "reloadTime": 2.2,
       "noiseRadius": 40,
-      "reactionTime": 1.2
+      "reactionTime": 1.1,
+      "reaimTime": 0.5,
+      "offscreenAimMult": 1.6,
+      "trackSpeed": 4.6,
+      "trackSpeedFiring": 2.2,
+      "hitRadius": 0.5,
+      "aimStartOffset": 1.8,
+      "aimHeight": 1.1,
+      "airbornePenalty": 0.6,
+      "loseAimAfter": 0.6,
+      "forgetAimAfter": 2.5,
+      "dodgedPauseMult": 1.5,
+      "tokenRest": 0.9
     },
     "cover": {
       "searchRadius": 16,
@@ -59,7 +71,14 @@
         0.8,
         1.6
       ],
-      "suppressedHideTime": 1.2
+      "suppressedHideTime": 1.2,
+      "stuckTime": 1.2,
+      "strafeEvery": [
+        2.2,
+        3.8
+      ],
+      "strafeRadius": 4,
+      "strafeMinDist": 4.5
     },
     "patrol": {
       "waitTime": [
@@ -72,7 +91,35 @@
     },
     "duckDefault": 1.2,
     "suppressionDecay": 0.6,
-    "punishWindow": 0.35
+    "punishWindow": 0.35,
+    "hit": {
+      "_note": "Hit reactions. stagger seconds (x onBeatMult on the beat), knockback m/s per point of damage.",
+      "stagger": 0.45,
+      "staggerHeavy": 0.85,
+      "heavyDamage": 20,
+      "heavyImpulse": 5,
+      "onBeatMult": 1.4,
+      "knockbackPerDamage": 0.14,
+      "knockbackMax": 6,
+      "knockbackDecay": 6,
+      "deathKnockback": 3,
+      "fireRestAfterHit": 0.9
+    },
+    "shove": {
+      "_note": "Close-range rifle-butt shove: telegraphed (enemyTelegraph kind 'melee'), commits to a direction, dodgeable.",
+      "range": 1.7,
+      "reach": 0.5,
+      "arcDeg": 100,
+      "windup": 0.55,
+      "recover": 0.65,
+      "damage": 8,
+      "push": 5,
+      "pushUp": 2,
+      "cooldown": [
+        2.5,
+        4.0
+      ]
+    }
   },
   "drone": {
     "hp": 40,
@@ -127,7 +174,39 @@
     },
     "spotShareInterval": 0.5,
     "duckDefault": 1.5,
-    "punishWindow": 0.35
+    "punishWindow": 0.35,
+    "dive": {
+      "_note": "Beat-telegraphed dive. Wind-up for windupBeats, line locked on the commit beat, then a recovery window low over the ground.",
+      "everyBeats": 10,
+      "windupBeats": 2,
+      "maxRange": 22,
+      "speed": 21,
+      "damage": 14,
+      "hitRadius": 1.15,
+      "aimHeight": 0.9,
+      "overshoot": 3.0,
+      "minPassHeight": 0.7,
+      "push": 6,
+      "pushUp": 2.5,
+      "windupRise": 1.2,
+      "recoverTime": 2.0,
+      "recoverAltitude": 1.1,
+      "vulnerableMult": 1.5,
+      "keepGun": false
+    },
+    "visual": {
+      "bobAmp": 0.12,
+      "bobHz": 0.9,
+      "bankPerYawRate": 0.25,
+      "bankPerAccel": 0.03,
+      "tiltPerAccel": 0.03,
+      "tiltPerSpeed": 0.035,
+      "windupTilt": 0.5
+    },
+    "hit": {
+      "knockbackPerDamage": 0.25,
+      "knockbackMax": 7
+    }
   },
   "squad": {
     "commsDelay": 0.4,
@@ -140,7 +219,8 @@
     "searchPoints": 6,
     "searchDuration": 25,
     "calloutCooldown": 3.5,
-    "maxShooters": 2
+    "maxShooters": 2,
+    "offscreenCos": 0.45
   },
   "cover": {
     "spacing": 1.2,
@@ -460,28 +540,28 @@
     "keepDistance": 2.6,
     "aggroRange": 30,
     "attackEvery": [
-      4,
-      3,
-      2
+      6,
+      5,
+      4
     ],
-    "windupBeats": 2,
+    "windupBeats": 4,
     "phaseAt": [
       0.66,
       0.33
     ],
     "roarBeats": 4,
-    "armor": 0.1,
+    "armor": 0.2,
     "weakMult": 2,
     "weakOpenTime": 1.8,
     "offBeatDuck": 0.3,
     "stomp": {
       "range": 5,
-      "damage": 22,
+      "damage": 20,
       "knockUp": 6,
       "crackRadius": 6
     },
     "throw": {
-      "damage": 20,
+      "damage": 16,
       "radius": 1.8,
       "flightBeats": 2,
       "minRange": 6,
@@ -499,6 +579,50 @@
       "damage": 5,
       "crackBeats": 2
     },
-    "debrisLife": 8
+    "debrisLife": 8,
+    "deathTime": 2.6,
+    "anim": {
+      "slamAt": 0.6,
+      "throwAt": 0.55,
+      "staggerTime": 0.8
+    }
+  },
+  "anim": {
+    "_note": "Enemy animation layer (src/ai/enemy-anim.js, encounters.js). walk/runSpeed are the authored clip speeds on the source rig (sourceHeight m tall); scaled by each role's height.",
+    "walkSpeed": 1.4,
+    "runSpeed": 5.0,
+    "sourceHeight": 1.8,
+    "blend": 9,
+    "poseBlend": 11,
+    "turnStep": 0.45,
+    "yawSmooth": 14,
+    "aimSpread": [
+      0.3,
+      0.3,
+      0.4
+    ],
+    "aimMaxYaw": 1.1,
+    "aimMaxPitch": 0.7,
+    "aimRate": 12,
+    "lookRate": 6,
+    "armBlend": 10,
+    "flinchStiffness": 90,
+    "flinchDamping": 13,
+    "flashTime": 0.16,
+    "flashGain": 1.6,
+    "shoveStrikeAt": 0.3,
+    "corpseTime": 3.5,
+    "corpseSink": 1.4
+  },
+  "fx": {
+    "_note": "Enemy attack readability VFX (src/ai/enemy-fx.js).",
+    "laserColor": 16723311,
+    "tracerColor": 16761466,
+    "diveColor": 16742957,
+    "laserWidth": 0.018,
+    "tracerWidth": 0.035,
+    "tracerSpeed": 140,
+    "tracerLength": 5,
+    "flashTime": 0.06
   }
 }

@@ -144,11 +144,21 @@ export class CoverSystem {
     let blind = null;
     for (let i = 0; i < Math.min(12, cands.length); i++) {
       const p = cands[i].p;
+      if (!this.reachable(q.from, p)) continue; // e.g. on another roof: the agent would just pile up at the edge
       if (!this.protects(p, q.threat)) continue;
       if (q.needPeek === false || this.canPeek(p, q.threat)) return p;
       blind ??= p;
     }
     return blind;
+  }
+
+  /** Can an agent standing at `from` walk to cover point `p`? (the navmesh path must end at the point) */
+  reachable(from, p) {
+    if (!this.nav?.path) return true;
+    const path = this.nav.path(from, p.pos);
+    if (!path.length) return false;
+    const end = path[path.length - 1];
+    return Math.hypot(end.x - p.pos.x, end.z - p.pos.z) < 0.9 && Math.abs(end.y - p.pos.y) < 1.2;
   }
 
   debugObject() {
