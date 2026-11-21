@@ -50,6 +50,7 @@ export function createMixHealth(bus, opts = {}) {
   let nodes = null;
   let lastDriveKey = -1;
   let lastCrushKey = -1;
+  let driveK = 1;
 
   const api = {
     /** 0 = clean (full health) .. 1 = wrecked (dead). */
@@ -95,7 +96,8 @@ export function createMixHealth(bus, opts = {}) {
     const dk = Math.round(d * 20);
     if (dk !== lastDriveKey) {
       lastDriveKey = dk;
-      nodes.drive.curve = driveCurve(1 + (cfg.maxDrive - 1) * Math.pow(dk / 20, 1.6));
+      driveK = 1 + (cfg.maxDrive - 1) * Math.pow(dk / 20, 1.6);
+      nodes.drive.curve = driveCurve(driveK);
     }
     const crushAmt = clamp01((cfg.crushBelow - health) / cfg.crushBelow);
     const ck = Math.round(crushAmt * 12);
@@ -106,9 +108,12 @@ export function createMixHealth(bus, opts = {}) {
     const cutoff = 20000 * Math.pow(cfg.minCutoff / 20000, Math.pow(d, 1.3));
     nodes.lp.frequency.cancelScheduledValues(t);
     nodes.lp.frequency.setTargetAtTime(cutoff, t, Math.max(0.01, glide / 3));
-    // keep loudness roughly level as drive squashes the signal
+    // Loudness-neutral: undo the gain the saturator adds at a typical programme level, so damage changes the
+    // character of the mix (grit, muffle) without ever turning it up.
+    const ref = cfg.loudnessRef ?? 0.25;
+    const makeup = driveK < 1.01 ? 1 : (ref * Math.tanh(driveK)) / Math.tanh(ref * driveK);
     nodes.post.gain.cancelScheduledValues(t);
-    nodes.post.gain.setTargetAtTime(1 - 0.25 * d, t, Math.max(0.01, glide / 3));
+    nodes.post.gain.setTargetAtTime(makeup, t, Math.max(0.01, glide / 3));
   }
 
   function spike(amount) {

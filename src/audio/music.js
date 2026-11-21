@@ -1,6 +1,7 @@
 // Music engine (C5). Two modes, both locked to the Tempo Sync clock:
-//  - stems: four procedural drum & bass layers (drums, bass, pad, arp) scheduled sample-accurately on the beat grid
-//    and crossfaded by combat intensity (calm = pad + light drums, full fight = everything).
+//  - stems: four procedural drum & bass layers (drums, bass, pad, arp) scheduled sample-accurately on the beat grid.
+//    By default the mix is fixed (cfg.level) so the music never swells with the fight; cfg.dynamic = true brings
+//    back the old behaviour where combat intensity adds layers (calm = pad + light drums, full fight = everything).
 //  - track: a loaded track (Kris's own music) looped on whole bars; intensity opens a low-pass filter instead.
 // Intensity: bus `resonance {value}` if anyone emits it, otherwise estimated from combat noise / damage events.
 //
@@ -29,6 +30,8 @@ const smooth = (a, b, x) => {
 
 export function createMusic({ ctx, output, clock, bus, cfg = {} }) {
   const lookahead = cfg.lookahead ?? 0.12;
+  const dynamic = cfg.dynamic === true;
+  const fixedLevel = Math.max(0, Math.min(1, cfg.level ?? 0.5));
   const stemBus = ctx.createGain();
   stemBus.connect(output);
 
@@ -292,7 +295,8 @@ export function createMusic({ ctx, output, clock, bus, cfg = {} }) {
       auto = Math.max(0, auto - dt * 0.06);
       explicit = Math.max(0, explicit - dt * 0.03);
       const target = forced ?? Math.max(auto, explicit);
-      intensity += (target - intensity) * Math.min(1, dt * 1.5);
+      if (dynamic || forced !== null) intensity += (target - intensity) * Math.min(1, dt * 1.5);
+      else intensity = fixedLevel; // constant mix: fighting does not make the music louder
       const now = ctx.currentTime;
       setStemLevels(now);
       if (!running || mode !== 'stems' || ctx.state !== 'running') return;
